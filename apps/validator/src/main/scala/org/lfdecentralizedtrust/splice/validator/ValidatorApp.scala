@@ -232,7 +232,7 @@ class ValidatorApp(
               case Some(migrationDump) =>
                 for {
                   allSequencerConnections <- domainConnector
-                    .getDecentralizedSynchronizerSequencerConnections(clock)
+                    .getDecentralizedSynchronizerSequencerConnections(Left(now))
                   sequencerConnections = allSequencerConnections.values.toSeq match {
                     case Seq() =>
                       sys.error("Expected at least one sequencer connection but got 0")

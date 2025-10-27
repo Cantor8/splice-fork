@@ -75,19 +75,19 @@ class DomainConnector(
   def ensureDecentralizedSynchronizerRegisteredAndConnectedWithCurrentConfig(clock: Clock)(implicit
       tc: TraceContext
   ): Future[Unit] = {
-    getDecentralizedSynchronizerSequencerConnections(clock).flatMap(x =>
+    getDecentralizedSynchronizerSequencerConnections(Right(clock)).flatMap(x =>
       MonadUtil.sequentialTraverse_(x.toList) { case (alias, connections) =>
         ensureDomainRegistered(alias, connections)
       }
     )
   }
 
-  def getDecentralizedSynchronizerSequencerConnections(clock: Clock)(implicit
-      tc: TraceContext
+  def getDecentralizedSynchronizerSequencerConnections(timeOrClock: Either[CantonTimestamp, Clock])(
+      implicit tc: TraceContext
   ): Future[Map[SynchronizerAlias, SequencerConnections]] = {
     config.domains.global.url match {
       case None =>
-        waitForSequencerConnectionsFromScan(clock)
+        waitForSequencerConnectionsFromScan(timeOrClock)
       case Some(url) =>
         Map(
           config.domains.global.alias -> SequencerConnections
@@ -124,8 +124,8 @@ class DomainConnector(
     )
   }
 
-  private def waitForSequencerConnectionsFromScan(clock: Clock)(implicit
-      tc: TraceContext
+  private def waitForSequencerConnectionsFromScan(timeOrClock: Either[CantonTimestamp, Clock])(
+      implicit tc: TraceContext
   ): Future[Map[SynchronizerAlias, SequencerConnections]] = {
     retryProvider.getValueWithRetries(
       // Short retries since usually a failure here is just a misconfiguration error.
@@ -135,7 +135,7 @@ class DomainConnector(
       RetryFor.ClientCalls,
       "scan_sequencer_connections",
       "non-empty sequencer connections from scan",
-      getSequencerConnectionsFromScan(Right(clock))
+      getSequencerConnectionsFromScan(timeOrClock)
         .map { case (connections, time) =>
           if (connections.isEmpty) {
             throw Status.NOT_FOUND
