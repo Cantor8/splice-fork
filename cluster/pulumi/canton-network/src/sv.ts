@@ -41,6 +41,7 @@ import {
   validatorOnboardingSecretName,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
+  approvedSvIdentities,
   CantonBftSynchronizerNode,
   CometbftSynchronizerNode,
   DecentralizedSynchronizerNode,
@@ -402,6 +403,7 @@ async function installValidator(
       ...(svConfig.validatorApp?.additionalEnvVars || []),
     ],
     additionalJvmOptions: svConfig.validatorApp?.additionalJvmOptions || '',
+    resources: svConfig.validatorApp?.resources,
   });
 
   return validator;
@@ -497,7 +499,7 @@ function installSvApp(
       },
     })),
     isDevNet: config.isDevNet,
-    approvedSvIdentities: config.approvedSvIdentities,
+    approvedSvIdentities: approvedSvIdentities(),
     persistence: persistenceConfig(postgres, svDbName),
     identitiesExport: config.identitiesBackupLocation,
     participantIdentitiesDumpImport: config.bootstrappingDumpConfig
@@ -523,6 +525,7 @@ function installSvApp(
     maxVettingDelay: networkWideConfig?.maxVettingDelay,
     logLevel: config.logging?.appsLogLevel,
     additionalEnvVars,
+    resources: config.svApp?.resources,
   } as ChartValues;
 
   if (config.onboarding.type == 'join-with-key') {
@@ -593,6 +596,7 @@ function installScan(
     enablePostgresMetrics: true,
     logLevel: config.logging?.appsLogLevel,
     additionalEnvVars: config.scanApp?.additionalEnvVars || [],
+    resources: config.scanApp?.resources,
   };
 
   if (svsConfig?.scan?.externalRateLimits) {
