@@ -155,6 +155,7 @@ components:
           additionalProperties:
             type: integer
             format: int32
+        # Openapi generator scala-http4s cannot handle binary field properly
         extra:
           type: string
           format: binary
