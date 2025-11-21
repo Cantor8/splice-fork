@@ -12,7 +12,6 @@ import {
   installSpliceHelmChart,
   loadYamlFromFile,
   LogLevel,
-  lowResourceSequencer,
   sanitizedForPostgres,
   sequencerTokenExpirationTime,
   SPLICE_ROOT,
@@ -72,6 +71,7 @@ abstract class InStackDecentralizedSynchronizerNode
     version: CnChartVersion,
     logLevel?: LogLevel,
     logLevelStdout?: LogLevel,
+    logAsyncFlush?: boolean,
     imagePullServiceAccountName?: string,
     opts?: SpliceCustomResourceOptions
   ) {
@@ -96,6 +96,7 @@ abstract class InStackDecentralizedSynchronizerNode
         ...{
           logLevel: logLevel,
           logLevelStdout: logLevelStdout,
+          logAsyncFlush: logAsyncFlush,
           sequencer: {
             ...decentralizedSynchronizerValues.sequencer,
             persistence: {
@@ -108,20 +109,7 @@ abstract class InStackDecentralizedSynchronizerNode
             driver: driver,
             tokenExpirationTime: sequencerTokenExpirationTime,
             additionalEnvVars: svConfig.sequencer?.additionalEnvVars,
-            resources: lowResourceSequencer
-              ? {
-                  resources: {
-                    limits: {
-                      cpu: '3',
-                      memory: '4Gi',
-                    },
-                    requests: {
-                      cpu: '1',
-                      memory: '2Gi',
-                    },
-                  },
-                }
-              : svConfig.sequencer?.resources,
+            resources: svConfig.sequencer?.resources,
           },
           mediator: {
             ...decentralizedSynchronizerValues.mediator,
@@ -245,6 +233,7 @@ export class InStackCometBftDecentralizedSynchronizerNode
       version,
       svConfig.logging?.cantonLogLevel,
       svConfig.logging?.cantonStdoutLogLevel,
+      svConfig.logging?.cantonAsync,
       imagePullServiceAccountName,
       opts
     );
@@ -280,6 +269,7 @@ export class InStackCantonBftDecentralizedSynchronizerNode extends InStackDecent
       version,
       svConfig.logging?.cantonLogLevel,
       svConfig.logging?.cantonStdoutLogLevel,
+      svConfig.logging?.cantonAsync,
       imagePullServiceAccountName,
       opts
     );

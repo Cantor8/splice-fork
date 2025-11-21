@@ -68,15 +68,11 @@ object DbScanVerdictStore {
   }
 
   def apply(
-      storage: com.digitalasset.canton.resource.Storage,
+      storage: com.digitalasset.canton.resource.DbStorage,
       updateHistory: UpdateHistory,
       loggerFactory: NamedLoggerFactory,
   )(implicit ec: ExecutionContext): DbScanVerdictStore =
-    storage match {
-      case db: DbStorage => new DbScanVerdictStore(db, updateHistory, loggerFactory)
-      case other =>
-        throw new RuntimeException(s"Unsupported storage type $other for DbScanVerdictStore")
-    }
+    new DbScanVerdictStore(storage, updateHistory, loggerFactory)
 }
 
 class DbScanVerdictStore(
@@ -94,6 +90,8 @@ class DbScanVerdictStore(
   val profile: slick.jdbc.JdbcProfile = PostgresProfile
 
   private def historyId = updateHistory.historyId
+
+  def waitUntilInitialized: Future[Unit] = updateHistory.waitUntilInitialized
 
   override protected def timeouts = new ProcessingTimeout
 

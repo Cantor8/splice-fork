@@ -13,7 +13,7 @@ import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
-import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
   SequencerConnectionPoolDelays,
@@ -94,7 +94,7 @@ class JoiningNodeInitializer(
     override protected val clock: Clock,
     override protected val domainTimeSync: DomainTimeSynchronization,
     override protected val domainUnpausedSync: DomainUnpausedSynchronization,
-    override protected val storage: Storage,
+    override protected val storage: DbStorage,
     override val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
     override protected val spliceInstanceNamesConfig: SpliceInstanceNamesConfig,
@@ -142,7 +142,7 @@ class JoiningNodeInitializer(
         SequencerConnections.tryMany(
           Seq(GrpcSequencerConnection.tryCreate(url)),
           PositiveInt.one,
-          // TODO(#2110) Rethink this when we enable sequencer connection pools.
+          // We only have a single connection here.
           sequencerLivenessMargin = NonNegativeInt.zero,
           config.participantClient.sequencerRequestAmplification,
           // TODO(#2666) Make the delays configurable.
@@ -252,6 +252,7 @@ class JoiningNodeInitializer(
                 localSynchronizerNode,
                 upgradesConfig,
                 packageVersionSupport,
+                config.parameters.enabledFeatures,
               )
             _ <- svStore.domains.waitForDomainConnection(config.domains.global.alias)
             _ <- dsoStore.domains.waitForDomainConnection(config.domains.global.alias)
@@ -314,7 +315,7 @@ class JoiningNodeInitializer(
         SvCantonIdentifierConfig.default(config)
       )
       _ <-
-        if (!config.skipSynchronizerInitialization) {
+        if (!config.shouldSkipSynchronizerInitialization) {
           localSynchronizerNode.traverse(lsn =>
             SynchronizerNodeInitializer.initializeLocalCantonNodesWithNewIdentities(
               cantonIdentifierConfig,
@@ -330,6 +331,15 @@ class JoiningNodeInitializer(
           )
           Future.unit
         }
+      _ <- ensureCantonNodesOTKRotatedIfNeeded(
+        config.skipSynchronizerInitialization,
+        cantonIdentifierConfig,
+        localSynchronizerNode,
+        clock,
+        loggerFactory,
+        retryProvider,
+        decentralizedSynchronizerId,
+      )
       _ <- onboard(
         decentralizedSynchronizerId,
         dsoAutomation,
@@ -373,7 +383,7 @@ class JoiningNodeInitializer(
         dsoPartyId,
       )
       _ <- retryProvider.waitUntil(
-        RetryFor.WaitingOnInitDependency,
+        RetryFor.WaitingOnInitDependencyLong,
         "dso_rules_visible",
         show"the DsoRules and AmuletRules are visible",
         dsoStore.getDsoRules().map(_ => ()),
@@ -399,7 +409,7 @@ class JoiningNodeInitializer(
         waitUntilCometBftNodeIsValidator,
       ).tupled
       _ <-
-        if (!config.skipSynchronizerInitialization) {
+        if (!config.shouldSkipSynchronizerInitialization) {
           localSynchronizerNode.traverse_ { localSynchronizerNode =>
             for {
               // First, make sure the identity of the new domain nodes is known on the domain
@@ -452,7 +462,7 @@ class JoiningNodeInitializer(
         }
       _ = dsoAutomationService.registerPostUnlimitedTrafficTriggers()
       _ <-
-        if (!config.skipSynchronizerInitialization) {
+        if (!config.shouldSkipSynchronizerInitialization) {
           synchronizerNodeReconciler
             .reconcileSynchronizerNodeConfigIfRequired(
               localSynchronizerNode,
@@ -845,6 +855,7 @@ class JoiningNodeInitializer(
                   localSynchronizerNode,
                   upgradesConfig,
                   packageVersionSupport,
+                  config.parameters.enabledFeatures,
                 )
                 _ <- dsoAutomation.store.domains.waitForDomainConnection(
                   config.domains.global.alias

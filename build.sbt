@@ -103,6 +103,8 @@ lazy val root: Project = (project in file("."))
     `splice-wallet-test-daml`,
     `splice-util-featured-app-proxies-daml`,
     `splice-util-featured-app-proxies-test-daml`,
+    `splice-util-token-standard-wallet-daml`,
+    `splice-util-token-standard-wallet-test-daml`,
     `splitwell-daml`,
     `splitwell-test-daml`,
     `splice-dso-governance-daml`,
@@ -228,6 +230,7 @@ lazy val docs = project
           (`splice-token-test-trading-app-daml` / Compile / damlBuild).value ++
           (`splice-wallet-payments-daml` / Compile / damlBuild).value ++
           (`splice-util-featured-app-proxies-daml` / Compile / damlBuild).value ++
+          (`splice-util-token-standard-wallet-daml` / Compile / damlBuild).value ++
           (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
@@ -794,6 +797,20 @@ lazy val `splice-util-featured-app-proxies-daml` =
     )
     .dependsOn(`canton-bindings-java`)
 
+lazy val `splice-util-token-standard-wallet-daml` =
+  project
+    .in(file("daml/splice-util-token-standard-wallet"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value ++
+          (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
+          (`splice-api-token-transfer-instruction-v1-daml` / Compile / damlBuild).value ++
+          (`splice-featured-app-api-v1-daml` / Compile / damlBuild).value,
+    )
+    .dependsOn(`canton-bindings-java`)
+
 lazy val `splice-util-featured-app-proxies-test-daml` =
   project
     .in(file("daml/splice-util-featured-app-proxies-test"))
@@ -803,6 +820,19 @@ lazy val `splice-util-featured-app-proxies-test-daml` =
       Compile / damlDependencies :=
         (`splice-token-standard-test-daml` / Compile / damlBuild).value ++
           (`splice-util-featured-app-proxies-daml` / Compile / damlBuild).value,
+      Compile / damlEnableJavaCodegen := false,
+    )
+    .dependsOn(`canton-bindings-java`)
+
+lazy val `splice-util-token-standard-wallet-test-daml` =
+  project
+    .in(file("daml/splice-util-token-standard-wallet-test"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`splice-token-standard-test-daml` / Compile / damlBuild).value ++
+          (`splice-util-token-standard-wallet-daml` / Compile / damlBuild).value,
       Compile / damlEnableJavaCodegen := false,
     )
     .dependsOn(`canton-bindings-java`)
@@ -1856,12 +1886,17 @@ checkErrors := {
 
   splitAndCheckCantonLogFile("canton", usesSimtime = false)
   splitAndCheckCantonLogFile("canton-simtime", usesSimtime = true)
+  splitAndCheckCantonLogFile("canton-missing-signatures", usesSimtime = false)
   import better.files._
   val dir = File("log/")
   if (dir.exists())
     dir
       .glob("canton-standalone-*.clog")
       .map(_.nameWithoutExtension)
+      .map(_.stripSuffix("_before_shutdown"))
+      .map(_.stripSuffix("_after_shutdown"))
+      .toList
+      .distinct
       .foreach { name =>
         splitAndCheckCantonLogFile(
           name,
@@ -1996,6 +2031,10 @@ updateTestConfigForParallelRuns := {
       "SvOffboardingIntegrationTest",
       "ManualStartIntegrationTest",
     ).exists(name.contains)
+  def isManualSignatureIntegrationTest(name: String): Boolean =
+    Seq(
+      "ManualSignatureIntegrationTest"
+    ).exists(name.contains)
   def isDockerComposeBasedTest(name: String): Boolean =
     name contains "DockerCompose"
   def isLocalNetTest(name: String): Boolean =
@@ -2019,6 +2058,11 @@ updateTestConfigForParallelRuns := {
 
   // Order matters as each test is included in just one group, with the first match being used
   val testSplitRules = Seq(
+    (
+      "manual tests with custom canton instance",
+      "test-full-class-names-signatures.log",
+      (t: String) => isManualSignatureIntegrationTest(t),
+    ),
     (
       "Unit tests",
       "test-full-class-names-non-integration.log",

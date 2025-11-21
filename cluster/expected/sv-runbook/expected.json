@@ -513,6 +513,16 @@
   },
   {
     "custom": true,
+    "id": "organization/infra/infra.mock",
+    "inputs": {
+      "name": "organization/infra/infra.mock"
+    },
+    "name": "organization/infra/infra.mock",
+    "provider": "",
+    "type": "pulumi:pulumi:StackReference"
+  },
+  {
+    "custom": true,
     "id": "",
     "inputs": {
       "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-scan",
@@ -895,6 +905,7 @@
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "https://sv.sv-2.mock.global.canton.network.digitalasset.com"
         },
+        "logAsyncFlush": false,
         "logLevel": "WARN",
         "maxVettingDelay": "1m",
         "metrics": {
@@ -1233,11 +1244,10 @@
         },
         "resources": {
           "limits": {
-            "memory": "2Gi"
+            "memory": "4Gi"
           },
           "requests": {
-            "cpu": "1",
-            "memory": "1Gi"
+            "memory": "2Gi"
           }
         },
         "scanAddress": "http://scan-app.sv:5012",

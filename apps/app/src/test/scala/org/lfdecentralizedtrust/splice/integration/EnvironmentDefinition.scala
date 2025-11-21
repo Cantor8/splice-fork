@@ -1,7 +1,8 @@
 package org.lfdecentralizedtrust.splice.integration
 
-import better.files.{File, Resource}
+import better.files.{File, Resource, *}
 import com.digitalasset.canton.admin.api.client.data.User
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, NonNegativeNumeric}
 import com.digitalasset.canton.config.{
   ClockConfig,
@@ -78,6 +79,14 @@ case class EnvironmentDefinition(
       // that blocks on all apps being initialized.
       .copy(setup = _ => ())
   }
+
+  def withStandardSetup: EnvironmentDefinition =
+    this
+      .withAllocatedUsers()
+      .withInitializedNodes()
+      .withTrafficTopupsEnabled
+      .withInitialPackageVersions
+      .withEagerAppActivityMarkerConversion
 
   def withAllocatedUsers(
       extraIgnoredSvPrefixes: Seq[String] = Seq.empty,
@@ -298,7 +307,7 @@ case class EnvironmentDefinition(
   def withAmuletPrice(price: BigDecimal): EnvironmentDefinition =
     addConfigTransforms((_, conf) => ConfigTransforms.setAmuletPrice(price)(conf))
 
-  /** For an SV’s sequencer to be safely usable, we need to wait for participantResponseTimeout + mediatorResponseTimeout.
+  /** For an SV’s sequencer to be safely usable, we need to wait for confirmationResponseTimeout + mediatorResponseTimeout.
     * However, in some tests, we do care that an SV can connect to their own sequencer reasonably quickly.
     * To make that work, we lower the delay to a number that is not fully safe but empirically
     * long enough that all in-flight transactions succeed or fail before.
@@ -378,6 +387,22 @@ case class EnvironmentDefinition(
         _.copy(miningRoundsCacheTimeToLiveOverride = Some(NonNegativeFiniteDuration.ofMillis(1)))
       )(config)
     )
+
+  def withoutAliceValidatorConnectingToSplitwell: EnvironmentDefinition = {
+    this
+      .addConfigTransform((_, conf) =>
+        conf.copy(validatorApps =
+          conf.validatorApps.updatedWith(InstanceName.tryCreate("aliceValidator")) {
+            _.map { aliceValidatorConfig =>
+              val withoutExtraDomains = aliceValidatorConfig.domains.copy(extra = Seq.empty)
+              aliceValidatorConfig.copy(
+                domains = withoutExtraDomains
+              )
+            }
+          }
+        )
+      )
+  }
 
   def clearConfigTransforms(): EnvironmentDefinition =
     copy(configTransformsWithContext = _ => Seq())
@@ -461,21 +486,29 @@ object EnvironmentDefinition extends CommonAppInstanceReferences {
 
   // Prefer this to `4Svs` for better test performance (unless your really need >1 SV of course).
   def simpleTopology1Sv(testName: String): EnvironmentDefinition = {
-    fromResources(Seq("simple-topology-1sv.conf"), testName)
-      .withAllocatedUsers()
-      .withInitializedNodes()
-      .withTrafficTopupsEnabled
-      .withInitialPackageVersions
-      .withEagerAppActivityMarkerConversion
+    fromResources(Seq("simple-topology-1sv.conf"), testName).withStandardSetup
   }
 
   def simpleTopology4Svs(testName: String): EnvironmentDefinition = {
-    fromResources(Seq("simple-topology.conf"), testName)
-      .withAllocatedUsers()
-      .withInitializedNodes()
-      .withTrafficTopupsEnabled
-      .withInitialPackageVersions
-      .withEagerAppActivityMarkerConversion
+    fromResources(Seq("simple-topology.conf"), testName).withStandardSetup
+  }
+
+  def simpleTopology1SvWithLocalValidator(testName: String): EnvironmentDefinition = {
+    val testResourcesPath: File = "apps" / "app" / "src" / "test" / "resources"
+    fromFiles(
+      testName,
+      testResourcesPath / "simple-topology-1sv.conf",
+      testResourcesPath / "local-validator-node" / "validator-app" / "app.conf",
+    ).withStandardSetup.withManualStart
+  }
+
+  def simpleTopology4SvsWithLocalValidator(testName: String): EnvironmentDefinition = {
+    val testResourcesPath: File = "apps" / "app" / "src" / "test" / "resources"
+    fromFiles(
+      testName,
+      testResourcesPath / "simple-topology.conf",
+      testResourcesPath / "local-validator-node" / "validator-app" / "app.conf",
+    ).withStandardSetup.withManualStart
   }
 
   def simpleTopology1SvWithSimTime(testName: String): EnvironmentDefinition =

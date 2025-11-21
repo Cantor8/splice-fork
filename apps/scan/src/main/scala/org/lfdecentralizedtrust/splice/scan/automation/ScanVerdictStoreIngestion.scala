@@ -71,9 +71,11 @@ class ScanVerdictStoreIngestion(
       val base: Source[Seq[v30.Verdict], NotUsed] =
         Source
           .future(
-            store
-              .maxVerdictRecordTime(migrationId)
-              .map(_.getOrElse(CantonTimestamp.MinValue))
+            store.waitUntilInitialized.flatMap(_ =>
+              store
+                .maxVerdictRecordTime(migrationId)
+                .map(_.getOrElse(CantonTimestamp.MinValue))
+            )
           )
           .map { ts =>
             logger.info(s"Streaming verdicts starting from $ts")
@@ -135,7 +137,7 @@ class ScanVerdictStoreIngestion(
             val lastRecordTime = batch.lastOption
               .flatMap(v => CantonTimestamp.fromProtoTimestamp(v.getRecordTime).toOption)
               .getOrElse(CantonTimestamp.MinValue)
-            ingestionMetrics.lastIngestedRecordTime.updateValue(lastRecordTime.toMicros)
+            ingestionMetrics.lastIngestedRecordTime.updateValue(lastRecordTime)
             ingestionMetrics.verdictCount.mark(batch.size.toLong)(MetricsContext.Empty)
             Success(
               TaskSuccess(

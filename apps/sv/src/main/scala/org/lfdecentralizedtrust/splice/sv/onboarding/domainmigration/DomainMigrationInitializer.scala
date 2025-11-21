@@ -4,7 +4,11 @@
 package org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration
 
 import cats.syntax.either.*
-import org.lfdecentralizedtrust.splice.config.{SpliceInstanceNamesConfig, UpgradesConfig}
+import org.lfdecentralizedtrust.splice.config.{
+  EnabledFeaturesConfig,
+  SpliceInstanceNamesConfig,
+  UpgradesConfig,
+}
 import org.lfdecentralizedtrust.splice.environment.{
   BaseLedgerConnection,
   MediatorAdminConnection,
@@ -55,7 +59,7 @@ import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForInit
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId, SynchronizerId}
@@ -86,7 +90,7 @@ class DomainMigrationInitializer(
     override protected val clock: Clock,
     override protected val domainTimeSync: DomainTimeSynchronization,
     override protected val domainUnpausedSync: DomainUnpausedSynchronization,
-    override protected val storage: Storage,
+    override protected val storage: DbStorage,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
     override protected val spliceInstanceNamesConfig: SpliceInstanceNamesConfig,
@@ -94,6 +98,7 @@ class DomainMigrationInitializer(
         Option[SvOnboardingConfig.JoinWithKey],
         Option[CometBftNode],
     ) => JoiningNodeInitializer,
+    enabledFeatures: EnabledFeaturesConfig,
 )(implicit
     ec: ExecutionContextExecutor,
     httpClient: HttpClient,
@@ -112,6 +117,7 @@ class DomainMigrationInitializer(
     participantAdminConnection,
     config.timeTrackerMinObservationDuration,
     config.timeTrackerObservationLatency,
+    newSequencerConnectionPool = enabledFeatures.newSequencerConnectionPool,
     loggerFactory,
   )
 
@@ -224,6 +230,7 @@ class DomainMigrationInitializer(
           spliceInstanceNamesConfig,
           loggerFactory,
           packageVersionSupport,
+          enabledFeatures,
         )
       // We register the traffic triggers earlier for domain migrations to ensure that SV nodes obtain
       // unlimited traffic and prevent lock-out issues due to lack of traffic (see #13868)
@@ -311,29 +318,37 @@ class DomainMigrationInitializer(
         synchronizerNodeInitiaizer,
         nodeIdentities.mediator,
       )
-      _ <- retryProvider.waitUntil(
-        RetryFor.WaitingOnInitDependency,
-        "mediator_up_to_date",
-        "mediator synced topology",
-        for {
-          sequencerTopology <- localSynchronizerNode.sequencerAdminConnection.listAllTransactions(
-            TopologyStoreId.Synchronizer(nodeIdentities.synchronizerId)
-          )
-          mediatorTopology <- mediatorAdminConnection.listAllTransactions(
-            TopologyStoreId.Synchronizer(nodeIdentities.synchronizerId)
-          )
-        } yield {
-          if (sequencerTopology.size != mediatorTopology.size) {
-            throw Status.FAILED_PRECONDITION
-              .withDescription(
-                s"""Mediator topology is not synchronized.
-                   |Sequencer topology size [${sequencerTopology.size}], mediator topology size [${mediatorTopology.size}].""".stripMargin
+
+      _ <-
+        if (config.validateTopologyAfterMigration) {
+          retryProvider.waitUntil(
+            RetryFor.WaitingOnInitDependency,
+            "mediator_up_to_date",
+            "mediator synced topology",
+            for {
+              sequencerTopology <- localSynchronizerNode.sequencerAdminConnection
+                .listAllTransactions(
+                  TopologyStoreId.Synchronizer(nodeIdentities.synchronizerId)
+                )
+              mediatorTopology <- mediatorAdminConnection.listAllTransactions(
+                TopologyStoreId.Synchronizer(nodeIdentities.synchronizerId)
               )
-              .asRuntimeException()
-          }
-        },
-        loggerFactory.getTracedLogger(getClass),
-      )
+            } yield {
+              if (sequencerTopology.size != mediatorTopology.size) {
+                throw Status.FAILED_PRECONDITION
+                  .withDescription(
+                    s"""Mediator topology is not synchronized.
+                   |Sequencer topology size [${sequencerTopology.size}], mediator topology size [${mediatorTopology.size}].""".stripMargin
+                  )
+                  .asRuntimeException()
+              }
+            },
+            loggerFactory.getTracedLogger(getClass),
+          )
+        } else {
+          logger.info("Topology validation mediator and sequencer is disabled")
+          Future.unit
+        }
     } yield {}
   }
 

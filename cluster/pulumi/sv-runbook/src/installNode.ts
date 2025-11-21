@@ -6,7 +6,6 @@ import {
   Auth0Client,
   BackupConfig,
   ChartValues,
-  cnsUiSecret,
   config,
   exactNamespace,
   ExactNamespace,
@@ -23,7 +22,7 @@ import {
   CLUSTER_HOSTNAME,
   svKeySecret,
   svKeyFromSecret,
-  validatorSecrets,
+  installValidatorSecrets,
   ExpectedValidatorOnboarding,
   SvIdKey,
   imagePullSecret,
@@ -36,7 +35,6 @@ import {
   activeVersion,
   daContactPoint,
   spliceInstanceNames,
-  DEFAULT_AUDIENCE,
   DecentralizedSynchronizerUpgradeConfig,
   ansDomainPrefix,
   svUserIds,
@@ -46,6 +44,9 @@ import {
   failOnAppVersionMismatch,
   networkWideConfig,
   getAdditionalJvmOptions,
+  installSvAppSecrets,
+  getSvAppApiAudience,
+  getValidatorAppApiAudience,
   externalIpRangesFile,
   clusterNetwork,
   CnChartVersion,
@@ -70,7 +71,6 @@ import { installRateLimits } from '../../common/src/ratelimit/rateLimit';
 import { SvAppConfig, ValidatorAppConfig } from './config';
 import { installCanton } from './decentralizedSynchronizer';
 import { installPostgres } from './postgres';
-import { svAppSecrets } from './utils';
 
 if (!isDevNet) {
   console.error('Launching in non-devnet mode');
@@ -236,20 +236,8 @@ async function installSvAndValidator(
 
   const svConfig = configForSv('sv');
   const auth0Config = auth0Client.getCfg();
-  const svNameSpaceAuth0Clients = auth0Config.namespaceToUiToClientId['sv'];
-  if (!svNameSpaceAuth0Clients) {
-    throw new Error('No SV namespace in auth0 config');
-  }
-  const svUiClientId = svNameSpaceAuth0Clients['sv'];
-  if (!svUiClientId) {
-    throw new Error('No SV ui client id in auth0 config');
-  }
 
-  const { appSecret: svAppSecret, uiSecret: svAppUISecret } = await svAppSecrets(
-    xns,
-    auth0Client,
-    svUiClientId
-  );
+  const svAppSecrets = await installSvAppSecrets(xns, auth0Client);
 
   svKeySecret(xns, svKey);
 
@@ -341,6 +329,7 @@ async function installSvAndValidator(
     initialAmuletPrice: initialAmuletPrice,
     maxVettingDelay: networkWideConfig?.maxVettingDelay,
     logLevel: svConfig.logging?.appsLogLevel,
+    logAsyncFlush: svConfig.logging?.appsAsync,
     additionalEnvVars: svAppAdditionalEnvVars,
     additionalJvmOptions: getAdditionalJvmOptions(svConfig.svApp?.additionalJvmOptions),
     resources: svConfig.svApp?.resources,
@@ -351,7 +340,7 @@ async function installSvAndValidator(
     ...persistenceForPostgres(appsPg, svValues),
     auth: {
       ...svValues.auth,
-      audience: auth0Config.appToApiAudience['sv'] || DEFAULT_AUDIENCE,
+      audience: getSvAppApiAudience(auth0Config, xns.logicalName),
     },
   };
 
@@ -366,15 +355,7 @@ async function installSvAndValidator(
     ...fixedTokensValue,
   };
 
-  const walletUiClientId = svNameSpaceAuth0Clients['wallet'];
-  if (!walletUiClientId) {
-    throw new Error('No SV ui client id in auth0 config');
-  }
-  const { appSecret: svValidatorAppSecret, uiSecret: svValidatorUISecret } = await validatorSecrets(
-    xns,
-    auth0Client,
-    walletUiClientId
-  );
+  const validatorSecrets = await installValidatorSecrets(xns, auth0Client);
 
   const sv = installSpliceRunbookHelmChart(
     xns,
@@ -386,7 +367,8 @@ async function installSvAndValidator(
       dependsOn: imagePullDeps
         .concat(canton.participant.asDependencies)
         .concat(canton.decentralizedSynchronizer.dependencies)
-        .concat([svAppSecret, svAppUISecret, appsPg])
+        .concat(svAppSecrets)
+        .concat([appsPg])
         .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : [])
         .concat(
           cometBftGovernanceKey ? svCometBftGovernanceKeySecret(xns, cometBftGovernanceKey) : []
@@ -439,7 +421,8 @@ async function installSvAndValidator(
     {
       dependsOn: imagePullDeps
         .concat(canton.participant.asDependencies)
-        .concat([svAppSecret, appsPg]),
+        .concat(svAppSecrets)
+        .concat([appsPg]),
     }
   );
 
@@ -478,7 +461,7 @@ async function installSvAndValidator(
     ...persistenceForPostgres(appsPg, validatorValues),
     auth: {
       ...validatorValues.auth,
-      audience: auth0Config.appToApiAudience['validator'] || DEFAULT_AUDIENCE,
+      audience: getValidatorAppApiAudience(auth0Config, xns.logicalName),
     },
   };
 
@@ -516,11 +499,6 @@ async function installSvAndValidator(
     additionalJvmOptions: getAdditionalJvmOptions(svConfig.validatorApp?.additionalJvmOptions),
   };
 
-  const cnsUiClientId = svNameSpaceAuth0Clients['cns'];
-  if (!cnsUiClientId) {
-    throw new Error('No CNS ui client id in auth0 config');
-  }
-
   const validator = installSpliceRunbookHelmChart(
     xns,
     'validator',
@@ -530,9 +508,8 @@ async function installSvAndValidator(
     {
       dependsOn: imagePullDeps
         .concat(canton.participant.asDependencies)
-        .concat([svValidatorAppSecret, svValidatorUISecret])
+        .concat(validatorSecrets)
         .concat(spliceConfig.pulumiProjectConfig.interAppsDependencies ? [sv] : [])
-        .concat([cnsUiSecret(xns, auth0Client, cnsUiClientId)])
         .concat(backupConfigSecret ? [backupConfigSecret] : [])
         .concat([appsPg]),
     }

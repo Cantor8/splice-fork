@@ -435,9 +435,11 @@ class DecentralizedSynchronizerMigrationIntegrationTest
         .getExternalPartyBalance(externalParty)
         .totalUnlockedCoin shouldBe "0.0000000000"
       walletClient.transferPreapprovalSend(externalParty, 40.0, UUID.randomUUID.toString)
-      validatorBackend
-        .getExternalPartyBalance(externalParty)
-        .totalUnlockedCoin shouldBe "40.0000000000"
+      eventually() {
+        validatorBackend
+          .getExternalPartyBalance(externalParty)
+          .totalUnlockedCoin shouldBe "40.0000000000"
+      }
       onboarding
     }
 
@@ -1000,14 +1002,14 @@ class DecentralizedSynchronizerMigrationIntegrationTest
 
             withClueAndLog("Backfilled history includes ACS import") {
               eventually() {
-                sv1ScanLocalBackend.appState.store.updateHistory.sourceHistory
+                sv1ScanLocalBackend.appState.automation.updateHistory.sourceHistory
                   .migrationInfo(1L)
                   .futureValue
                   .exists(_.complete) should be(true)
               }
 
               val backfilledUpdates =
-                sv1ScanLocalBackend.appState.store.updateHistory
+                sv1ScanLocalBackend.appState.automation.updateHistory
                   .getAllUpdates(None, PageLimit.tryCreate(1000))
                   .futureValue
               backfilledUpdates.collect {
@@ -1412,6 +1414,14 @@ class DecentralizedSynchronizerMigrationIntegrationTest
             Map("fake-key-4" -> "fake-value-4"),
             "",
             false,
+          )
+          participant.ledger_api.users.create(
+            s"fake-user-4-${suffix}",
+            Set(),
+            Option(someParties(0)),
+          )
+          participant.ledger_api.users.create(
+            s"fake-user-5-${suffix}"
           )
         }
       },

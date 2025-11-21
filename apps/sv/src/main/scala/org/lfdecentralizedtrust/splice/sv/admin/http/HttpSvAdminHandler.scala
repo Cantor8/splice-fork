@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.sv.admin.http
 
+import better.files.File.apply
 import cats.implicits.catsSyntaxApplicativeId
 import cats.syntax.either.*
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandler
@@ -57,7 +58,6 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
-import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, UpgradesConfig}
@@ -109,29 +109,18 @@ class HttpSvAdminHandler(
 
   // Similar to PublishScanConfigTrigger, this class creates its own scan connection
   // on demand, because scan might not be available at application startup.
-  private def createScanConnection(): Future[ScanConnection] =
-    config.scan match {
-      case None =>
-        Future.failed(
-          Status.UNAVAILABLE
-            .withDescription(
-              "This application is not configured to connect to a scan service. " +
-                " Check the application configuration or use the scan API to query votes information."
-            )
-            .asRuntimeException()
-        )
-      case Some(scanConfig) =>
-        implicit val tc: TraceContext = TraceContext.empty
-        ScanConnection
-          .singleUncached(
-            ScanAppClientConfig(NetworkAppClientConfig(scanConfig.internalUrl)),
-            upgradesConfig,
-            clock,
-            retryProvider,
-            loggerFactory,
-            retryConnectionOnInitialFailure = true,
-          )
-    }
+  private def createScanConnection(): Future[ScanConnection] = {
+    implicit val tc: TraceContext = TraceContext.empty
+    ScanConnection
+      .singleUncached(
+        ScanAppClientConfig(NetworkAppClientConfig(config.scan.internalUrl)),
+        upgradesConfig,
+        clock,
+        retryProvider,
+        loggerFactory,
+        retryConnectionOnInitialFailure = true,
+      )
+  }
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   private var scanConnectionV: Option[Future[ScanConnection]] = None
   private def scanConnectionF: Future[ScanConnection] = blocking {
@@ -638,9 +627,13 @@ class HttpSvAdminHandler(
         case Some(synchronizerNode) =>
           optDomainMigrationDumpConfig match {
             case Some(dumpPath) =>
-              for {
-                dump <- DomainMigrationDump
-                  .getDomainMigrationDump(
+              val exportAt = request.timestamp.map(Instant.parse)
+              val dumpRequest = exportAt match {
+                case Some(at) =>
+                  logger.info(
+                    s"Triggering synchronizer migration dump for possibly unpaused synchronizer at $at"
+                  )
+                  DomainMigrationDump.getDomainMigrationDumpUnsafe(
                     config.domains.global.alias,
                     svStoreWithIngestion.connection(SpliceLedgerConnectionPriority.Low),
                     participantAdminConnection,
@@ -649,12 +642,39 @@ class HttpSvAdminHandler(
                     dsoStore,
                     request.migrationId,
                     domainDataSnapshotGenerator,
+                    at,
                   )
+                case None =>
+                  logger.info("Triggering synchronizer migration dump for expected synchronizer")
+                  DomainMigrationDump
+                    .getDomainMigrationDump(
+                      config.domains.global.alias,
+                      svStoreWithIngestion.connection(SpliceLedgerConnectionPriority.Low),
+                      participantAdminConnection,
+                      synchronizerNode,
+                      loggerFactory,
+                      dsoStore,
+                      request.migrationId,
+                      domainDataSnapshotGenerator,
+                    )
+              }
+              for {
+                dump <- dumpRequest
               } yield {
                 import io.circe.syntax.*
+                val pathForTheFiles = exportAt.fold(dumpPath.getParent)(at =>
+                  dumpPath.getParent
+                    .createChild(
+                      s"export_at_${at.toEpochMilli}",
+                      asDirectory = true,
+                      createParents = true,
+                    )
+                    .path
+                )
+                logger.info(s"Writing dump at $pathForTheFiles")
                 val path = BackupDump.writeToPath(
-                  dumpPath,
-                  dump.toHttp(outputDirectory = Some(dumpPath.getParent.toString)).asJson.noSpaces,
+                  (pathForTheFiles / dumpPath.name).path,
+                  dump.toHttp(outputDirectory = Some(pathForTheFiles.toString)).asJson.noSpaces,
                 )
                 logger.info(s"Wrote domain migration dump at path $path")
                 SvAdminResource.TriggerDomainMigrationDumpResponseOK

@@ -20,7 +20,7 @@ import com.digitalasset.canton.config.{
 }
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
-import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
@@ -104,7 +104,7 @@ class SvApp(
     override val name: InstanceName,
     val config: SvAppBackendConfig,
     val amuletAppParameters: SharedSpliceAppParameters,
-    storage: Storage,
+    storage: DbStorage,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
@@ -239,6 +239,7 @@ class SvApp(
             svSynchronizerConfig.sequencer,
             cometBftConfig,
           ),
+          svSynchronizerConfig.mediator.pruning,
         )
       )
     initialize(
@@ -351,6 +352,7 @@ class SvApp(
                 retryProvider,
                 config.spliceInstanceNames,
                 loggerFactory,
+                config.parameters.enabledFeatures,
               )
               initializer.bootstrapDso()
             }
@@ -393,6 +395,7 @@ class SvApp(
               retryProvider,
               config.spliceInstanceNames,
               newJoiningNodeInitializer,
+              config.parameters.enabledFeatures,
             ).migrateDomain()
           }
         case None =>
@@ -411,6 +414,17 @@ class SvApp(
             }
           } yield res
       }
+      cantonIdentifierConfig = config.cantonIdentifierConfig.getOrElse(
+        SvCantonIdentifierConfig.default(config)
+      )
+      _ <- ParticipantInitializer.ensureInitializedWithRotatedOTK(
+        cantonIdentifierConfig.participant,
+        participantAdminConnection,
+        config.participantBootstrappingDump,
+        loggerFactory,
+        retryProvider,
+        decentralizedSynchronizer,
+      )
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         decentralizedSynchronizer,
         svAutomation.connection(SpliceLedgerConnectionPriority.Low),
@@ -468,17 +482,24 @@ class SvApp(
         },
         localSynchronizerNode match {
           case Some(node) =>
-            if (!config.skipSynchronizerInitialization) {
-              appInitStep(
-                "Ensure that the local mediators's sequencer request amplification config is up to date"
-              ) {
-                // Normally we set this up during mediator init
-                // but if the config changed without a mediator reset we need to update it here.
-                node.ensureMediatorSequencerRequestAmplification()
-              }
+            if (!config.shouldSkipSynchronizerInitialization) {
+              for {
+                _ <- appInitStep(
+                  "Ensure that the local mediators's sequencer request amplification config is up to date"
+                ) {
+                  // Normally we set this up during mediator init
+                  // but if the config changed without a mediator reset we need to update it here.
+                  node.ensureMediatorSequencerRequestAmplification()
+                }
+                _ <- appInitStep(
+                  "Ensure that the local mediators's pruning config is up to date"
+                ) {
+                  node.ensureMediatorPruningSchedule()
+                }
+              } yield ()
             } else {
               logger.info(
-                "Skipping mediator sequencer amplification configuration because skipSynchronizerInitialization is enabled"
+                "Skipping mediator configuration because skipSynchronizerInitialization is enabled"
               )
               Future.unit
             }
@@ -548,15 +569,18 @@ class SvApp(
         participantAdminConnection,
         new DomainDataSnapshotGenerator(
           participantAdminConnection,
-          Some(
-            localSynchronizerNode
-              .getOrElse(
-                sys.error("SV app should always have a sequencer connection for domain migrations")
-              )
-              .sequencerAdminConnection
-          ),
+          localSynchronizerNode
+            .getOrElse(
+              sys.error("SV app should always have a sequencer connection for domain migrations")
+            )
+            .sequencerAdminConnection,
           dsoStore,
-          new AcsExporter(participantAdminConnection, retryProvider, loggerFactory),
+          new AcsExporter(
+            participantAdminConnection,
+            retryProvider,
+            config.parameters.enabledFeatures.enableNewAcsExport,
+            loggerFactory,
+          ),
           retryProvider,
           loggerFactory,
         ),
@@ -569,6 +593,7 @@ class SvApp(
       httpRateLimiter = new HttpRateLimiter(
         config.parameters.rateLimiting,
         metrics.openTelemetryMetricsFactory,
+        loggerFactory.getTracedLogger(classOf[HttpRateLimiter]),
       )
 
       route = cors(
@@ -781,7 +806,7 @@ object SvApp {
   case class State(
       participantAdminConnection: ParticipantAdminConnection,
       localSynchronizerNode: Option[LocalSynchronizerNode],
-      storage: Storage,
+      storage: DbStorage,
       domainTimeAutomationService: DomainTimeAutomationService,
       domainParamsAutomationService: DomainParamsAutomationService,
       svStore: SvSvStore,

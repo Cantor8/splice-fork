@@ -88,9 +88,8 @@ object BuildCommon {
           // "-Wunused:patvars",
           "-Wunused:privates",
           "-Wunused:params",
-          // https://github.com/scala/bug/issues/12883 I have no idea what's the purpouse of that warning
+          // https://github.com/scala/bug/issues/12883 I have no idea what's the purpose of that warning
           "-Wconf:msg=access modifiers for `.*` method are copied from the case class constructor under Scala 3:s",
-          "-quickfix:any",
         ),
         Test / testOptions ++= Seq(
           // Enable logging of begin and end of test cases, test suites, and test runs.
@@ -1515,7 +1514,11 @@ object BuildCommon {
           "com.lihaoyi" %% "ujson" % "4.0.2",
         ),
       )
-      .dependsOn(`canton-ledger-api`)
+      .dependsOn(
+        `canton-ledger-api`,
+        `canton-community-testing` % Test,
+        `canton-community-common` % Test,
+      )
   }
 
   lazy val `canton-sequencer-driver-api` = {

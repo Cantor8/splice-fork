@@ -94,6 +94,7 @@ class HttpValidatorAdminHandler(
     participantAdminConnection,
     retryProvider,
     loggerFactory,
+    config.parameters.enabledFeatures,
   )
 
   private def requireWalletEnabled[T](handleRequest: UserWalletManager => T): T = {
@@ -220,7 +221,10 @@ class HttpValidatorAdminHandler(
                   transportSecurity,
                 )
             }.toVector,
-            connectionConfig.sequencerConnections.sequencerTrustThreshold.value,
+            sequencerTrustThreshold =
+              connectionConfig.sequencerConnections.sequencerTrustThreshold.value,
+            sequencerLivenessMargin =
+              connectionConfig.sequencerConnections.sequencerLivenessMargin.value,
             definitions.SequencerSubmissionRequestAmplification(
               connectionConfig.sequencerConnections.submissionRequestAmplification.factor.value,
               connectionConfig.sequencerConnections.submissionRequestAmplification.patience.duration.toSeconds,

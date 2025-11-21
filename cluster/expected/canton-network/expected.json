@@ -755,6 +755,16 @@
   },
   {
     "custom": true,
+    "id": "organization/infra/infra.mock",
+    "inputs": {
+      "name": "organization/infra/infra.mock"
+    },
+    "name": "organization/infra/infra.mock",
+    "provider": "",
+    "type": "pulumi:pulumi:StackReference"
+  },
+  {
+    "custom": true,
     "id": "",
     "inputs": {
       "apiVersion": "v1",
@@ -857,14 +867,14 @@
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
           "audience": "https://canton.network.global",
-          "client-id": "sv-1-client-id",
+          "client-id": "sv1-sv-client-id",
           "client-secret": "***",
-          "ledger-api-user": "sv-1-client-id@clients",
+          "ledger-api-user": "sv1-sv-client-id@clients",
           "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
         }
       }
     },
-    "name": "splice-auth0-secret-sv-1-sv-1",
+    "name": "splice-auth0-secret-sv-1-sv",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -889,7 +899,32 @@
         }
       }
     },
-    "name": "splice-auth0-secret-sv-1-sv1_validator",
+    "name": "splice-auth0-secret-sv-1-validator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-sv-ledger-api-auth",
+        "namespace": "sv-da-1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "audience": "https://canton.network.global",
+          "client-id": "sv-da-1-sv-client-id",
+          "client-secret": "***",
+          "ledger-api-user": "sv-da-1-sv-client-id@clients",
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "splice-auth0-secret-sv-da-1-sv",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -914,32 +949,7 @@
         }
       }
     },
-    "name": "splice-auth0-secret-sv-da-1-sv-da-1_validator",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "name": "splice-app-sv-ledger-api-auth",
-        "namespace": "sv-da-1"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "audience": "https://canton.network.global",
-          "client-id": "sv-da-1-client-id",
-          "client-secret": "***",
-          "ledger-api-user": "sv-da-1-client-id@clients",
-          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
-        }
-      }
-    },
-    "name": "splice-auth0-secret-sv-da-1-sv-da-1",
+    "name": "splice-auth0-secret-sv-da-1-validator",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -983,7 +993,7 @@
         }
       }
     },
-    "name": "splice-auth0-ui-secret-sv-1-sv-1",
+    "name": "splice-auth0-ui-secret-sv-1-sv",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1049,7 +1059,7 @@
         }
       }
     },
-    "name": "splice-auth0-ui-secret-sv-da-1-sv-da-1",
+    "name": "splice-auth0-ui-secret-sv-da-1-sv",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1557,6 +1567,7 @@
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "isFirstSv": true,
+        "logAsyncFlush": false,
         "logLevel": "WARN",
         "mediatorAddress": "global-domain-3-mediator",
         "metrics": {
@@ -1751,6 +1762,7 @@
           "readVsWriteScalingFactor": 4
         },
         "isDevNet": false,
+        "logAsyncFlush": false,
         "logLevel": "WARN",
         "maxVettingDelay": "1m",
         "metrics": {
@@ -1861,6 +1873,7 @@
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "logAsyncFlush": false,
         "logLevel": "WARN",
         "maxVettingDelay": "1m",
         "metrics": {
@@ -1893,11 +1906,10 @@
         },
         "resources": {
           "limits": {
-            "memory": "2Gi"
+            "memory": "4Gi"
           },
           "requests": {
-            "cpu": "1",
-            "memory": "1Gi"
+            "memory": "2Gi"
           }
         },
         "scanAddress": "http://scan-app.sv-1:5012",
@@ -2424,6 +2436,7 @@
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "isFirstSv": false,
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "mediatorAddress": "global-domain-3-mediator",
         "metrics": {
@@ -2593,6 +2606,7 @@
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app.sv-1:5014"
         },
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "maxVettingDelay": "1m",
         "metrics": {
@@ -2701,6 +2715,7 @@
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "logAsyncFlush": false,
         "logLevel": "INFO",
         "maxVettingDelay": "1m",
         "metrics": {
@@ -2733,11 +2748,10 @@
         },
         "resources": {
           "limits": {
-            "memory": "2Gi"
+            "memory": "4Gi"
           },
           "requests": {
-            "cpu": "1",
-            "memory": "1Gi"
+            "memory": "2Gi"
           }
         },
         "scanAddress": "http://scan-app.sv-da-1:5012",
