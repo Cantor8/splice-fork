@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.config
 
 import com.digitalasset.canton.config.*
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.config.StartupMemoryCheckConfig.ReportingLevel.Warn
 import com.digitalasset.canton.environment.CantonNodeParameters
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
@@ -69,7 +70,7 @@ final case class CircuitBreakersConfig(
 
 final case class EnabledFeaturesConfig(
     enableNewAcsExport: Boolean = true,
-    newSequencerConnectionPool: Boolean = false,
+    newSequencerConnectionPool: Boolean = true,
 )
 
 /** This class aggregates binary-level configuration options that are shared between each Splice app instance.
@@ -115,4 +116,6 @@ case class SharedSpliceAppParameters(
   override def watchdog: Option[WatchdogConfig] = None
 
   override def startupMemoryCheckConfig: StartupMemoryCheckConfig = StartupMemoryCheckConfig(Warn)
+
+  def dispatchQueueBackpressureLimit: NonNegativeInt = ???
 }

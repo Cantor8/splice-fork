@@ -64,6 +64,9 @@ inThisBuild(
 //    semanticdbIncludeInJar := true, // cache it in the remote cache
     semanticdbEnabled := true,
     semanticdbVersion := scalafixSemanticdb.revision,
+    // slows down just the non integration tests which is a really small subset
+    // this helps us get actual realistic times for how long a test takes to run
+    Test / parallelExecution := false,
   )
 )
 
@@ -939,6 +942,7 @@ lazy val `apps-common` =
         spray_json,
         pekko_spray_json,
         Dependencies.parallel_collections,
+        pekko_connectors_google_cloud_storage,
       ),
       BuildCommon.sharedAppSettings,
       buildInfoKeys := Seq[BuildInfoKey](
@@ -1080,7 +1084,14 @@ lazy val `apps-scan` =
       `splice-dso-governance-daml`,
     )
     .settings(
-      libraryDependencies ++= Seq(pekko_http_cors, scalapb_runtime_grpc, scalapb_runtime),
+      libraryDependencies ++= Seq(
+        pekko_http_cors,
+        scalapb_runtime_grpc,
+        scalapb_runtime,
+        zstd,
+        aws_s3,
+        s3mock_testcontainers,
+      ),
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
@@ -1418,7 +1429,7 @@ lazy val `apps-splitwell-frontend` = {
     .dependsOn(`apps-common-frontend`)
     .settings(
       commonFrontendBundle := (`apps-common-frontend` / bundle).value._2,
-      frontendWorkspace := "splitwell-frontend",
+      frontendWorkspace := "@lfdecentralizedtrust/splice-splitwell-frontend",
       sharedFrontendSettings,
     )
 }
@@ -1945,6 +1956,7 @@ lazy val `apps-app`: Project =
       libraryDependencies += kubernetes_client,
       libraryDependencies +=
         "com.google.cloud" % "google-cloud-bigquery" % "2.53.0" % "test",
+      libraryDependencies += "com.monovore" %% "decline" % "2.5.0" % "test",
       // Force SBT to use the right version of opentelemetry libs.
       dependencyOverrides ++= Seq(
         CantonDependencies.opentelemetry_api,
@@ -1955,8 +1967,7 @@ lazy val `apps-app`: Project =
         CantonDependencies.opentelemetry_zipkin,
         CantonDependencies.opentelemetry_instrumentation_grpc,
         CantonDependencies.opentelemetry_instrumentation_runtime_metrics,
-      ) ++ Seq("netty-handler-proxy", "netty-codec-socks")
-        .map("io.netty" % _ % CantonDependencies.netty_version % "test"),
+      ),
       BuildCommon.sharedAppSettings,
       BuildCommon.cantonWarts,
       bundleTask,
@@ -2037,8 +2048,11 @@ updateTestConfigForParallelRuns := {
     ).exists(name.contains)
   def isDockerComposeBasedTest(name: String): Boolean =
     name contains "DockerCompose"
+  // TODO(#3429): for now, we put bulk storage tests in isLocalNetTest, since it 1) requires docker to run s3mock, and 2) does not require canton.
+  // If we keep it here, we should rename isLocalNetTest to be something like "withDockerWithoutCanton".
+  // Alternatively, consider creating a separate group for it, since this one e.g. builds the images which we don't need for the bulk-storage tests.
   def isLocalNetTest(name: String): Boolean =
-    name contains "LocalNet"
+    name.contains("LocalNet") || name.contains("BulkStorageTest")
   def isCometBftTest(name: String): Boolean =
     name contains "CometBft"
   def isRecordTimeToleranceTest(name: String): Boolean =
@@ -2062,6 +2076,11 @@ updateTestConfigForParallelRuns := {
       "manual tests with custom canton instance",
       "test-full-class-names-signatures.log",
       (t: String) => isManualSignatureIntegrationTest(t),
+    ),
+    (
+      "tests for localnet",
+      "test-full-class-names-local-net-based.log",
+      (t: String) => isLocalNetTest(t),
     ),
     (
       "Unit tests",
@@ -2142,11 +2161,6 @@ updateTestConfigForParallelRuns := {
       "resource intensive tests",
       "test-full-class-names-resource-intensive.log",
       (t: String) => isResourceIntensiveTest(t),
-    ),
-    (
-      "tests for localnet",
-      "test-full-class-names-local-net-based.log",
-      (t: String) => isLocalNetTest(t),
     ),
     (
       "tests using docker images",

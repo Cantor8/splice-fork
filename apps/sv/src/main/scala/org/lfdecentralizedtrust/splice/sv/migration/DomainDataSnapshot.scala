@@ -42,6 +42,7 @@ final case class DomainDataSnapshot(
       }.toVector,
       synchronizerWasPaused = Some(synchronizerWasPaused),
       separatePayloadFiles = Some(outputDirectory.isDefined),
+      acsFormat = Some(http.DomainDataSnapshot.AcsFormat.LedgerApi),
     )
   }
 
@@ -83,15 +84,20 @@ object DomainDataSnapshot {
         Dar(dar.hash, ByteString.copyFrom(decoded))
       }
     val acsTimestamp = Instant.parse(src.acsTimestamp)
-    Right(
-      DomainDataSnapshot(
-        src.genesisState.map(DomainMigrationEncoding.decode(src.separatePayloadFiles, _)),
-        DomainMigrationEncoding.decode(src.separatePayloadFiles, src.acsSnapshot),
-        acsTimestamp,
-        dars,
-        src.synchronizerWasPaused.getOrElse(false),
-      )
-    )
+    src.acsFormat.getOrElse(http.DomainDataSnapshot.AcsFormat.AdminApi) match {
+      case http.DomainDataSnapshot.AcsFormat.members.AdminApi =>
+        Left("Admin API ACS Format is unsupported since splice 0.5")
+      case http.DomainDataSnapshot.AcsFormat.members.LedgerApi =>
+        Right(
+          DomainDataSnapshot(
+            src.genesisState.map(DomainMigrationEncoding.decode(src.separatePayloadFiles, _)),
+            DomainMigrationEncoding.decode(src.separatePayloadFiles, src.acsSnapshot),
+            acsTimestamp,
+            dars,
+            src.synchronizerWasPaused.getOrElse(false),
+          )
+        )
+    }
   }
 
 }

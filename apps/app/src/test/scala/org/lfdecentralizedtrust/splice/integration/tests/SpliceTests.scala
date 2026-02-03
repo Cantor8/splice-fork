@@ -27,7 +27,7 @@ import com.digitalasset.canton.tracing.NoReportingTracerProvider
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.pekko.Done
-import org.apache.pekko.actor.{ActorSystem, CoordinatedShutdown}
+import org.apache.pekko.actor.CoordinatedShutdown
 import org.apache.pekko.http.scaladsl.Http
 import org.lfdecentralizedtrust.splice.admin.api.client.{DamlGrpcClientMetrics, GrpcClientMetrics}
 import org.lfdecentralizedtrust.splice.auth.AuthUtil
@@ -80,7 +80,10 @@ object SpliceTests extends LazyLogging {
   val testRetryProvider = new RetryProvider(
     NamedLoggerFactory.root,
     ProcessingTimeout(),
-    new FutureSupervisor.Impl(NonNegativeDuration.tryFromDuration(10.seconds))(testScheduler),
+    new FutureSupervisor.Impl(
+      NonNegativeDuration.tryFromDuration(10.seconds),
+      NamedLoggerFactory.root,
+    )(testScheduler),
     NoOpMetricsFactory,
   )(NoReportingTracerProvider.tracer)
 
@@ -264,7 +267,7 @@ object SpliceTests extends LazyLogging {
     // make `aliceSplitwell` etc. use updated usernames
     override def rsw(name: String)(implicit
         env: SpliceTestConsoleEnvironment
-    ): SplitwellAppClientReference = extendLedgerApiUserWithCaseId(super.rsw(name))(env.actorSystem)
+    ): SplitwellAppClientReference = extendLedgerApiUserWithCaseId(super.rsw(name))
 
     override def perTestCaseName(name: String)(implicit env: SpliceTestConsoleEnvironment) =
       s"${name}_tc$testCaseId.unverified.$ansAcronym"
@@ -294,7 +297,7 @@ object SpliceTests extends LazyLogging {
 
     private def extendLedgerApiUserWithCaseId(
         ref: SplitwellAppClientReference
-    )(implicit actorSystem: ActorSystem): SplitwellAppClientReference = {
+    ): SplitwellAppClientReference = {
       val newLedgerApiUser = perTestCaseNameWithoutUnverified(ref.config.ledgerApiUser)
       val newLedgerApiConfig = ref.config.participantClient.ledgerApi
         .copy(authConfig =

@@ -6,7 +6,7 @@ import {
   loadJsonFromFile,
   externalIpRangesFile,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
-import { clusterYamlConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/configLoader';
+import { clusterYamlConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager';
 import util from 'node:util';
 import { z } from 'zod';
@@ -91,8 +91,10 @@ export const InfraConfigSchema = z.object({
     ipWhitelisting: z
       .object({
         extraWhitelistedIngress: z.array(z.string()).default([]),
+        excludedIps: z.array(z.string()).default([]),
       })
       .optional(),
+    enableGCReaperJob: z.boolean().default(false),
     prometheus: z.object({
       storageSize: z.string(),
       retentionDuration: z.string(),
@@ -102,6 +104,7 @@ export const InfraConfigSchema = z.object({
     istio: z.object({
       enableIngressAccessLogging: z.boolean(),
       enableClusterAccessLogging: z.boolean().default(false),
+      istiodValues: z.object({}).catchall(z.any()).default({}),
     }),
     extraCustomResources: z.object({}).catchall(z.any()).default({}),
   }),
@@ -116,7 +119,7 @@ export type Config = z.infer<typeof InfraConfigSchema>;
 // eslint-disable-next-line
 // @ts-ignore
 const fullConfig = InfraConfigSchema.parse(clusterYamlConfig);
-
+export const enableGCReaperJob = fullConfig.infra.enableGCReaperJob;
 console.error(
   `Loaded infra config: ${util.inspect(fullConfig, {
     depth: null,
@@ -161,8 +164,12 @@ export function loadIPRanges(svsOnly: boolean = false): pulumi.Output<string[]> 
   });
 
   const configWhitelistedIps = infraConfig.ipWhitelisting?.extraWhitelistedIngress || [];
+  const excludedIps = infraConfig.ipWhitelisting?.excludedIps || [];
 
   return internalWhitelistedIps.apply(whitelists =>
-    whitelists.concat(externalIpRanges).concat(configWhitelistedIps)
+    whitelists
+      .concat(externalIpRanges)
+      .concat(configWhitelistedIps)
+      .filter(ip => excludedIps.indexOf(ip) < 0)
   );
 }

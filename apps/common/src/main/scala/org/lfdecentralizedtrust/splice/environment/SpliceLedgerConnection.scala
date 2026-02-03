@@ -6,8 +6,9 @@ package org.lfdecentralizedtrust.splice.environment
 import com.daml.ledger.api.v2 as lapi
 import com.daml.ledger.api.v2.admin.identity_provider_config_service.IdentityProviderConfig
 import com.daml.ledger.api.v2.admin.{ObjectMetaOuterClass, UserManagementServiceOuterClass}
+import com.daml.ledger.api.v2.event
 import com.daml.ledger.api.v2.package_reference.PackageReference
-import com.daml.ledger.javaapi.data.codegen.{Created, Exercised, HasCommands, Update}
+import com.daml.ledger.javaapi.data.codegen.{ContractId, Created, Exercised, HasCommands, Update}
 import com.daml.ledger.javaapi.data.{Command, CreatedEvent, ExercisedEvent, Transaction, User}
 import com.digitalasset.base.error.ErrorResource
 import com.digitalasset.base.error.utils.ErrorDetails
@@ -148,6 +149,13 @@ class BaseLedgerConnection(
         Seq[IncompleteReassignmentEvent.Assign],
     )
   ] = activeContracts(filter.toEventFormat, offset)
+
+  def getContract(
+      contractId: ContractId[?],
+      queryingParties: Seq[PartyId],
+  )(implicit tc: TraceContext): Future[Option[event.CreatedEvent]] = {
+    client.getContract(contractId, queryingParties)
+  }
 
   def getConnectedDomains(party: PartyId)(implicit
       tc: TraceContext
@@ -479,6 +487,15 @@ class BaseLedgerConnection(
     } yield userRights.collect { case actAs: User.Right.CanActAs =>
       PartyId.tryFromProtoPrimitive(actAs.party)
     }.toSet
+  }
+
+  def listUserRights(
+      username: String
+  )(implicit tc: TraceContext): Future[Set[User.Right]] = {
+    val userId = Ref.UserId.assertFromString(username)
+    for {
+      userRights <- client.listUserRights(userId)
+    } yield userRights.toSet
   }
 
   def grantUserRights(
@@ -1262,7 +1279,7 @@ class SpliceLedgerConnection(
 
   // run in connected to out first, *then start* fb
   // but proactively cancel the in->out graph if fb fails
-  private[this] def cancelIfFailed[A, E, B](in: Source[E, _])(out: Sink[E, Future[A]])(
+  private[this] def cancelIfFailed[A, E, B](in: Source[E, ?])(out: Sink[E, Future[A]])(
       fb: => Future[B]
   ): (KillSwitch, Future[(A, B)]) = {
     val (ks, fa) = in.viaMat(KillSwitches.single)(Keep.right).toMat(out)(Keep.both).run()

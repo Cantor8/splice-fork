@@ -47,8 +47,18 @@ pulumiProjectConfig:
 pulumiStacks:
   default:
     parallelism: 64
+    resources:
+      requests:
+        memory: '2Gi'
+  canton-network:
+    resources:
+      requests:
+        memory: '4Gi'
   multi-validator:
     parallelism: 10
+    resources:
+      requests:
+        memory: '6Gi'
 validator1:
   logging:
     level: DEBUG
@@ -80,7 +90,7 @@ monitoring:
       # we alert if the rate is higher than expected to spot potential overload situations
       confirmationRequests:
         total:
-          rate: 15
+          rate: 25
           overMinutes: 5
         perMember:
           rate: 3
@@ -148,6 +158,9 @@ svs:
       cantonLogLevel: DEBUG
       cantonAsync: false
       cometbftLogLevel: debug
+    pruning:
+      sequencer:
+        enabled: false
     participant:
       bftSequencerConnection: true
       resources:

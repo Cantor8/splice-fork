@@ -373,6 +373,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -541,6 +548,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -639,6 +653,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -690,6 +708,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -770,6 +795,10 @@
         },
         "databaseFlags": [
           {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
+          {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
@@ -835,6 +864,10 @@
           "pointInTimeRecoveryEnabled": true
         },
         "databaseFlags": [
+          {
+            "name": "random_page_cost",
+            "value": "1.1"
+          },
           {
             "name": "temp_file_limit",
             "value": "2147483647"
@@ -905,6 +938,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -957,6 +997,11 @@
             "prefix": "mock/splitwell"
           }
         },
+        "participantPruningSchedule": {
+          "cron": "0 /10 * * * ?",
+          "maxDuration": "5m",
+          "retention": "30d"
+        },
         "persistence": {
           "databaseName": "val_splitwell",
           "port": 5432,
@@ -964,6 +1009,10 @@
           "schema": "val_splitwell",
           "secretName": "validator-pg-secrets",
           "user": "cnadmin"
+        },
+        "pvc": {
+          "volumeName": "domain-migration-validator-pvc",
+          "volumeStorageClass": "standard-rwo"
         },
         "resources": {},
         "scanAddress": "http://scan-app.sv-1:5012",

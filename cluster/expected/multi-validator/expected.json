@@ -329,6 +329,13 @@
                         {
                           "key": "cn_apps",
                           "operator": "Exists"
+                        },
+                        {
+                          "key": "cn_apps",
+                          "operator": "NotIn",
+                          "values": [
+                            "hyperdisk"
+                          ]
                         }
                       ]
                     }
@@ -766,6 +773,13 @@
                         {
                           "key": "cn_apps",
                           "operator": "Exists"
+                        },
+                        {
+                          "key": "cn_apps",
+                          "operator": "NotIn",
+                          "values": [
+                            "hyperdisk"
+                          ]
                         }
                       ]
                     }
@@ -1203,6 +1217,13 @@
                         {
                           "key": "cn_apps",
                           "operator": "Exists"
+                        },
+                        {
+                          "key": "cn_apps",
+                          "operator": "NotIn",
+                          "values": [
+                            "hyperdisk"
+                          ]
                         }
                       ]
                     }
@@ -1640,6 +1661,13 @@
                         {
                           "key": "cn_apps",
                           "operator": "Exists"
+                        },
+                        {
+                          "key": "cn_apps",
+                          "operator": "NotIn",
+                          "values": [
+                            "hyperdisk"
+                          ]
                         }
                       ]
                     }
@@ -2077,6 +2105,13 @@
                         {
                           "key": "cn_apps",
                           "operator": "Exists"
+                        },
+                        {
+                          "key": "cn_apps",
+                          "operator": "NotIn",
+                          "values": [
+                            "hyperdisk"
+                          ]
                         }
                       ]
                     }
@@ -2540,6 +2575,13 @@
                         {
                           "key": "cn_apps",
                           "operator": "Exists"
+                        },
+                        {
+                          "key": "cn_apps",
+                          "operator": "NotIn",
+                          "values": [
+                            "hyperdisk"
+                          ]
                         }
                       ]
                     }
@@ -2642,6 +2684,10 @@
                   {
                     "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_YOLO",
                     "value": "canton.validator-apps.validator_backend_INDEX.automation.paused-triggers += \"org.lfdecentralizedtrust.splice.wallet.automation.ExpireTransferOfferTrigger\"\ncanton.validator-apps.validator_backend_INDEX.automation.paused-triggers += \"org.lfdecentralizedtrust.splice.wallet.automation.ExpireAcceptedTransferOfferTrigger\"\n"
+                  },
+                  {
+                    "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_PARTICIPANT_PRUNING",
+                    "value": "canton.validator-apps.validator_backend_INDEX.participant-pruning-schedule {\n  cron = \"0 /10 * * * ?\"\n  max-duration = \"5m\"\n  retention = \"25h\"\n}\n"
                   }
                 ],
                 "image": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/multi-validator:0.3.20",
@@ -2978,6 +3024,13 @@
                         {
                           "key": "cn_apps",
                           "operator": "Exists"
+                        },
+                        {
+                          "key": "cn_apps",
+                          "operator": "NotIn",
+                          "values": [
+                            "hyperdisk"
+                          ]
                         }
                       ]
                     }
@@ -3080,6 +3133,10 @@
                   {
                     "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_YOLO",
                     "value": "canton.validator-apps.validator_backend_INDEX.automation.paused-triggers += \"org.lfdecentralizedtrust.splice.wallet.automation.ExpireTransferOfferTrigger\"\ncanton.validator-apps.validator_backend_INDEX.automation.paused-triggers += \"org.lfdecentralizedtrust.splice.wallet.automation.ExpireAcceptedTransferOfferTrigger\"\n"
+                  },
+                  {
+                    "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_PARTICIPANT_PRUNING",
+                    "value": "canton.validator-apps.validator_backend_INDEX.participant-pruning-schedule {\n  cron = \"0 /10 * * * ?\"\n  max-duration = \"5m\"\n  retention = \"25h\"\n}\n"
                   }
                 ],
                 "image": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/multi-validator:0.3.20",
@@ -3416,6 +3473,13 @@
                         {
                           "key": "cn_apps",
                           "operator": "Exists"
+                        },
+                        {
+                          "key": "cn_apps",
+                          "operator": "NotIn",
+                          "values": [
+                            "hyperdisk"
+                          ]
                         }
                       ]
                     }
@@ -3518,6 +3582,10 @@
                   {
                     "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_YOLO",
                     "value": "canton.validator-apps.validator_backend_INDEX.automation.paused-triggers += \"org.lfdecentralizedtrust.splice.wallet.automation.ExpireTransferOfferTrigger\"\ncanton.validator-apps.validator_backend_INDEX.automation.paused-triggers += \"org.lfdecentralizedtrust.splice.wallet.automation.ExpireAcceptedTransferOfferTrigger\"\n"
+                  },
+                  {
+                    "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_PARTICIPANT_PRUNING",
+                    "value": "canton.validator-apps.validator_backend_INDEX.participant-pruning-schedule {\n  cron = \"0 /10 * * * ?\"\n  max-duration = \"5m\"\n  retention = \"25h\"\n}\n"
                   }
                 ],
                 "image": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/multi-validator:0.3.20",
@@ -3854,6 +3922,13 @@
                         {
                           "key": "cn_apps",
                           "operator": "Exists"
+                        },
+                        {
+                          "key": "cn_apps",
+                          "operator": "NotIn",
+                          "values": [
+                            "hyperdisk"
+                          ]
                         }
                       ]
                     }
@@ -3956,6 +4031,10 @@
                   {
                     "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_YOLO",
                     "value": "canton.validator-apps.validator_backend_INDEX.automation.paused-triggers += \"org.lfdecentralizedtrust.splice.wallet.automation.ExpireTransferOfferTrigger\"\ncanton.validator-apps.validator_backend_INDEX.automation.paused-triggers += \"org.lfdecentralizedtrust.splice.wallet.automation.ExpireAcceptedTransferOfferTrigger\"\n"
+                  },
+                  {
+                    "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_PARTICIPANT_PRUNING",
+                    "value": "canton.validator-apps.validator_backend_INDEX.participant-pruning-schedule {\n  cron = \"0 /10 * * * ?\"\n  max-duration = \"5m\"\n  retention = \"25h\"\n}\n"
                   }
                 ],
                 "image": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/multi-validator:0.3.20",
@@ -4292,6 +4371,13 @@
                         {
                           "key": "cn_apps",
                           "operator": "Exists"
+                        },
+                        {
+                          "key": "cn_apps",
+                          "operator": "NotIn",
+                          "values": [
+                            "hyperdisk"
+                          ]
                         }
                       ]
                     }
@@ -4394,6 +4480,10 @@
                   {
                     "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_YOLO",
                     "value": "canton.validator-apps.validator_backend_INDEX.automation.paused-triggers += \"org.lfdecentralizedtrust.splice.wallet.automation.ExpireTransferOfferTrigger\"\ncanton.validator-apps.validator_backend_INDEX.automation.paused-triggers += \"org.lfdecentralizedtrust.splice.wallet.automation.ExpireAcceptedTransferOfferTrigger\"\n"
+                  },
+                  {
+                    "name": "MULTI_VALIDATOR_ADDITIONAL_CONFIG_PARTICIPANT_PRUNING",
+                    "value": "canton.validator-apps.validator_backend_INDEX.participant-pruning-schedule {\n  cron = \"0 /10 * * * ?\"\n  max-duration = \"5m\"\n  retention = \"25h\"\n}\n"
                   }
                 ],
                 "image": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/multi-validator:0.3.20",
@@ -4773,12 +4863,51 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
               ]
             }
           }
+        },
+        "appsAffinityAndTolerations": {
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_apps",
+                        "operator": "Exists"
+                      },
+                      {
+                        "key": "cn_apps",
+                        "operator": "NotIn",
+                        "values": [
+                          "hyperdisk"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_apps",
+              "operator": "Exists"
+            }
+          ]
         },
         "db": {
           "maxConnections": 1000,
@@ -4830,12 +4959,51 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
               ]
             }
           }
+        },
+        "appsAffinityAndTolerations": {
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_apps",
+                        "operator": "Exists"
+                      },
+                      {
+                        "key": "cn_apps",
+                        "operator": "NotIn",
+                        "values": [
+                          "hyperdisk"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_apps",
+              "operator": "Exists"
+            }
+          ]
         },
         "db": {
           "maxConnections": 1000,
@@ -4887,12 +5055,51 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
               ]
             }
           }
+        },
+        "appsAffinityAndTolerations": {
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_apps",
+                        "operator": "Exists"
+                      },
+                      {
+                        "key": "cn_apps",
+                        "operator": "NotIn",
+                        "values": [
+                          "hyperdisk"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_apps",
+              "operator": "Exists"
+            }
+          ]
         },
         "db": {
           "maxConnections": 1000,
@@ -4944,12 +5151,51 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
               ]
             }
           }
+        },
+        "appsAffinityAndTolerations": {
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_apps",
+                        "operator": "Exists"
+                      },
+                      {
+                        "key": "cn_apps",
+                        "operator": "NotIn",
+                        "values": [
+                          "hyperdisk"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_apps",
+              "operator": "Exists"
+            }
+          ]
         },
         "db": {
           "maxConnections": 1000,
@@ -5001,12 +5247,51 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
               ]
             }
           }
+        },
+        "appsAffinityAndTolerations": {
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_apps",
+                        "operator": "Exists"
+                      },
+                      {
+                        "key": "cn_apps",
+                        "operator": "NotIn",
+                        "values": [
+                          "hyperdisk"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_apps",
+              "operator": "Exists"
+            }
+          ]
         },
         "db": {
           "maxConnections": 1000,

@@ -53,6 +53,10 @@ export interface ConfigChange {
    * If the field is an id, e.g a party id.
    */
   isId?: boolean;
+  /**
+   * If the field should be disabled for editing.
+   */
+  disabled?: boolean;
 }
 
 export interface UpdateSvRewardWeightProposal {
@@ -142,6 +146,7 @@ export type ProposalListingStatus =
 export interface ProposalListingData {
   contractId: ContractId<VoteRequest>;
   actionName: string;
+  description?: string;
   votingThresholdDeadline: string;
   voteTakesEffect: string;
   yourVote: YourVoteStatus;

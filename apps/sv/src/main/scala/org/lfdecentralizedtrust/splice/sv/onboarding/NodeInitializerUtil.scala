@@ -3,56 +3,50 @@
 
 package org.lfdecentralizedtrust.splice.sv.onboarding
 
-import org.lfdecentralizedtrust.splice.config.{
-  EnabledFeaturesConfig,
-  NetworkAppClientConfig,
-  SpliceInstanceNamesConfig,
-  UpgradesConfig,
-}
-import org.lfdecentralizedtrust.splice.environment.{
-  BaseLedgerConnection,
-  PackageVersionSupport,
-  ParticipantAdminConnection,
-  RetryFor,
-  RetryProvider,
-  SpliceLedgerClient,
-}
-import org.lfdecentralizedtrust.splice.http.HttpClient
-import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
-import org.lfdecentralizedtrust.splice.store.{
-  DomainTimeSynchronization,
-  DomainUnpausedSynchronization,
-}
-import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
-import org.lfdecentralizedtrust.splice.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
-import org.lfdecentralizedtrust.splice.sv.cometbft.{CometBftNode, CometBftRequestSigner}
-import org.lfdecentralizedtrust.splice.sv.config.{SvAppBackendConfig, SvCantonIdentifierConfig}
-import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
-import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
+import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.digitalasset.canton.admin.api.client.data.SequencerAdminStatus.implicitPrettyString
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
-import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.stream.Materializer
-import com.digitalasset.canton.admin.api.client.data.SequencerAdminStatus.implicitPrettyString
-
-import scala.jdk.CollectionConverters.*
 import io.grpc.Status
+import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.config.{
+  EnabledFeaturesConfig,
+  NetworkAppClientConfig,
+  SpliceInstanceNamesConfig,
+  UpgradesConfig,
+}
 import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection.INITIAL_ROUND_USER_METADATA_KEY
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
+import org.lfdecentralizedtrust.splice.environment.*
+import org.lfdecentralizedtrust.splice.http.HttpClient
+import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
+import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
+import org.lfdecentralizedtrust.splice.store.{
+  DomainTimeSynchronization,
+  DomainUnpausedSynchronization,
+}
+import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.SvConnection
+import org.lfdecentralizedtrust.splice.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
+import org.lfdecentralizedtrust.splice.sv.cometbft.{CometBftNode, CometBftRequestSigner}
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.{
   DomainMigration,
   FoundDso,
   JoinWithKey,
 }
+import org.lfdecentralizedtrust.splice.sv.config.{SvAppBackendConfig, SvCantonIdentifierConfig}
 import org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration.DomainMigrationInitializer.loadDomainMigrationDump
-import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
-import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
+import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
+import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
+import scala.jdk.CollectionConverters.*
 
 trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNodeConfigClient {
 
@@ -71,6 +65,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       key: SvStore.Key,
       domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
+      acsStoreDescriptorUserVersion: Option[Long],
   )(implicit
       ec: ExecutionContext,
       templateDecoder: TemplateJsonDecoder,
@@ -83,6 +78,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
     domainMigrationInfo,
     participantId,
     config.automation.ingestion,
+    acsStoreDescriptorUserVersion,
   )
 
   protected def newSvSvAutomationService(
@@ -95,6 +91,8 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       ec: ExecutionContextExecutor,
       mat: Materializer,
       tracer: Tracer,
+      esf: ExecutionSequencerFactory,
+      actorSystem: ActorSystem,
   ) =
     new SvSvAutomationService(
       clock,
@@ -108,6 +106,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       participantAdminConnection,
       localSynchronizerNode,
       retryProvider,
+      config.topologySnapshotConfig,
       loggerFactory,
     )
 
@@ -115,6 +114,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       key: SvStore.Key,
       domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
+      acsStoreDescriptorUserVersion: Option[Long],
   )(implicit
       ec: ExecutionContext,
       templateDecoder: TemplateJsonDecoder,
@@ -128,6 +128,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       domainMigrationInfo,
       participantId,
       config.automation.ingestion,
+      acsStoreDescriptorUserVersion,
     )
   }
 
@@ -290,10 +291,6 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       mat: Materializer,
   ): Future[Long] = {
     for {
-      bootstrapWithNonZeroRound <- packageVersionSupport.supportBootstrapWithNonZeroRound(
-        Seq(svParty),
-        clock.now,
-      )
       initialRound <- connection
         // On restarts, use the user's metadata initial round
         // On resets, the initial SV set it to its configuration, followers learn it from their sponsor
@@ -303,49 +300,59 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
             logger.info(s"Initial round $round is already set in user's metadata.")
             Future.successful(round.toLong)
           case None =>
-            config.onboarding match {
-              case Some(onboardingConfig) if bootstrapWithNonZeroRound.supported =>
-                onboardingConfig match {
-                  case onboardingConfig: FoundDso =>
-                    logger.info(
-                      s"Setting the configured initial round ${onboardingConfig.initialRound}."
-                    )
-                    setInitialRound(connection, onboardingConfig.initialRound)
-                  case onboardingConfig: JoinWithKey =>
-                    logger.info("Setting the initial round given by my sponsor.")
-                    setInitialRoundFromSponsor(
-                      connection,
-                      onboardingConfig,
-                      upgradesConfig,
-                    )
-                  case domainMigrationConfig: DomainMigration =>
-                    val migrationDump = loadDomainMigrationDump(domainMigrationConfig.dumpFilePath)
-                    val initialRound = migrationDump.participantUsers.users.collectFirst {
-                      case user if user.id == config.ledgerApiUser =>
-                        user.annotations.get(INITIAL_ROUND_USER_METADATA_KEY)
-                    }.flatten match {
-                      case None =>
+            packageVersionSupport
+              .supportBootstrapWithNonZeroRound(
+                Seq(svParty),
+                clock.now,
+              )
+              .flatMap { bootstrapWithNonZeroRound =>
+                config.onboarding match {
+                  case Some(onboardingConfig) if bootstrapWithNonZeroRound.supported =>
+                    onboardingConfig match {
+                      case onboardingConfig: FoundDso =>
                         logger.info(
-                          "Initial round not found in user's metadata dump, defaulting to 0."
+                          s"Setting the configured initial round ${onboardingConfig.initialRound}."
                         )
-                        "0"
-                      case Some(rnd) =>
-                        logger.info(
-                          s"Setting the initial round to $rnd from migration user's metadata dump."
+                        setInitialRound(connection, onboardingConfig.initialRound)
+                      case onboardingConfig: JoinWithKey =>
+                        logger.info("Setting the initial round given by my sponsor.")
+                        setInitialRoundFromSponsor(
+                          connection,
+                          onboardingConfig,
+                          upgradesConfig,
                         )
-                        rnd
+                      case domainMigrationConfig: DomainMigration =>
+                        val migrationDump =
+                          loadDomainMigrationDump(domainMigrationConfig.dumpFilePath)
+                        val initialRound = migrationDump.participantUsers.users.collectFirst {
+                          case user if user.id == config.ledgerApiUser =>
+                            user.annotations.get(INITIAL_ROUND_USER_METADATA_KEY)
+                        }.flatten match {
+                          case None =>
+                            logger.info(
+                              "Initial round not found in user's metadata dump, defaulting to 0."
+                            )
+                            "0"
+                          case Some(rnd) =>
+                            logger.info(
+                              s"Setting the initial round to $rnd from migration user's metadata dump."
+                            )
+                            rnd
+                        }
+                        setInitialRound(connection, initialRound.toLong)
                     }
-                    setInitialRound(connection, initialRound.toLong)
+                  case Some(_) =>
+                    logger.debug(
+                      "Feature to set initial round to non-zero not supported, setting it to 0."
+                    )
+                    setInitialRound(connection, 0L)
+                  case None =>
+                    logger.debug(
+                      "No SV onboarding config was found, setting the initial round to 0."
+                    )
+                    setInitialRound(connection, 0L)
                 }
-              case Some(_) =>
-                logger.debug(
-                  "Feature to set initial round to non-zero not supported, setting it to 0."
-                )
-                setInitialRound(connection, 0L)
-              case None =>
-                logger.debug("No SV onboarding config was found, setting the initial round to 0.")
-                setInitialRound(connection, 0L)
-            }
+              }
         }
     } yield initialRound
   }

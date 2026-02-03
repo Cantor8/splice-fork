@@ -27,6 +27,7 @@ import org.lfdecentralizedtrust.splice.config.{
   GcpBucketConfig,
   LedgerApiClientConfig,
   ParticipantBootstrapDumpConfig,
+  PeriodicBackupDumpConfig,
   PruningConfig,
   SpliceBackendConfig,
   SpliceInstanceNamesConfig,
@@ -34,6 +35,7 @@ import org.lfdecentralizedtrust.splice.config.{
 }
 import org.lfdecentralizedtrust.splice.environment.{DarResource, DarResources}
 import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
+import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.SpliceUtil
 
 import java.nio.file.Path
@@ -79,6 +81,8 @@ object SvBootstrapDumpConfig {
 
 object SvOnboardingConfig {
   case class FoundDso(
+      acsCommitmentReconciliationInterval: PositiveDurationSeconds =
+        SvUtil.defaultAcsCommitmentReconciliationInterval,
       name: String,
       firstSvRewardWeightBps: Long,
       dsoPartyHint: String = "DSO",
@@ -98,6 +102,8 @@ object SvOnboardingConfig {
       initialFeaturedAppActivityMarkerAmount: Option[BigDecimal] = Some(BigDecimal(1.0)),
       voteCooldownTime: Option[NonNegativeFiniteDuration] = None,
       initialRound: Long = 0L,
+      developmentFundPercentage: Option[BigDecimal] = None,
+      developmentFundManager: Option[PartyId] = None,
   ) extends SvOnboardingConfig
 
   case class JoinWithKey(
@@ -336,6 +342,8 @@ case class SvAppBackendConfig(
     // every SV tries to convert markers from any other SV's book of work (in a contention avoiding fashion)
     delegatelessAutomationFeaturedAppActivityMarkerCatchupThreshold: Int = 10_000,
     delegatelessAutomationExpiredAmuletBatchSize: Int = 100,
+    // configuration to periodically take topology snapshots
+    topologySnapshotConfig: Option[PeriodicBackupDumpConfig] = None,
     bftSequencerConnection: Boolean = true,
     // Skip synchronizer initialization and synchronizer config reconciliation.
     // Can be safely set to true for an SV that has completed onboarding unless you
@@ -357,6 +365,10 @@ case class SvAppBackendConfig(
     // If true, we check that topology on mediator and sequencer is the same after
     // a migration. This can be a useful assertion but is very slow so should not be enabled on clusters with large topology state.
     validateTopologyAfterMigration: Boolean = false,
+    // The threshold above which unclaimed development fund coupons will be merged.
+    unclaimedDevelopmentFundCouponsThreshold: Int = 10,
+    svAcsStoreDescriptorUserVersion: Option[Long] = None,
+    dsoAcsStoreDescriptorUserVersion: Option[Long] = None,
 ) extends SpliceBackendConfig {
 
   def shouldSkipSynchronizerInitialization =

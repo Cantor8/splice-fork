@@ -16,6 +16,7 @@ import {
   sequencerTokenExpirationTime,
   SPLICE_ROOT,
   SpliceCustomResourceOptions,
+  standardStorageClassName,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   CometBftNodeConfigs,
@@ -60,7 +61,6 @@ abstract class InStackDecentralizedSynchronizerNode
       sequencerPostgres: Postgres;
       mediatorPostgres: Postgres;
     },
-    active: boolean,
     driver:
       | { type: 'cometbft'; host: Output<string>; port: number }
       | {
@@ -135,7 +135,7 @@ abstract class InStackDecentralizedSynchronizerNode
           pvc: spliceConfig.configuration.persistentHeapDumps
             ? {
                 size: '10Gi',
-                volumeStorageClass: 'standard-rwo',
+                volumeStorageClass: standardStorageClassName,
               }
             : undefined,
           serviceAccountName: imagePullServiceAccountName,
@@ -224,7 +224,6 @@ export class InStackCometBftDecentralizedSynchronizerNode
     this.installDecentralizedSynchronizer(
       svConfig,
       dbs,
-      active,
       {
         type: 'cometbft',
         host: pulumi.interpolate`${cometbftRelease.rpcServiceName}.${xns.logicalName}.svc.cluster.local`,
@@ -251,7 +250,6 @@ export class InStackCantonBftDecentralizedSynchronizerNode extends InStackDecent
       sequencerPostgres: Postgres;
       mediatorPostgres: Postgres;
     },
-    active: boolean,
     version: CnChartVersion,
     imagePullServiceAccountName?: string,
     opts?: SpliceCustomResourceOptions
@@ -260,7 +258,6 @@ export class InStackCantonBftDecentralizedSynchronizerNode extends InStackDecent
     this.installDecentralizedSynchronizer(
       svConfig,
       dbs,
-      active,
       {
         type: 'cantonbft',
         externalAddress: `sequencer-p2p-${migrationId}.${ingressName}.${CLUSTER_HOSTNAME}`,

@@ -9,6 +9,7 @@ import cats.implicits.{
   catsSyntaxTuple4Semigroupal,
 }
 import cats.syntax.functorFilter.*
+import com.daml.grpc.adapter.ExecutionSequencerFactory
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.config.{
@@ -93,6 +94,7 @@ import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion.SpliceLedgerConnectionPriority
 
@@ -119,6 +121,8 @@ class SV1Initializer(
     override protected val spliceInstanceNamesConfig: SpliceInstanceNamesConfig,
     override protected val loggerFactory: NamedLoggerFactory,
     enabledFeatures: EnabledFeaturesConfig,
+    svAcsStoreDescriptorUserVersion: Option[Long],
+    dsoAcsStoreDescriptorUserVersion: Option[Long],
 )(implicit
     ec: ExecutionContextExecutor,
     httpClient: HttpClient,
@@ -126,6 +130,8 @@ class SV1Initializer(
     closeContext: CloseContext,
     mat: Materializer,
     tracer: Tracer,
+    esf: ExecutionSequencerFactory,
+    actorSystem: ActorSystem,
 ) extends NodeInitializerUtil {
 
   import SV1Initializer.bootstrapTransactionOrdering
@@ -277,8 +283,13 @@ class SV1Initializer(
           currentMigrationId = config.domainMigrationId, // Note: not guaranteed to be 0 for sv1
           migrationTimeInfo = None, // No previous migration, we're starting the network
         )
-      svStore = newSvStore(storeKey, migrationInfo, participantId)
-      dsoStore = newDsoStore(svStore.key, migrationInfo, participantId)
+      svStore = newSvStore(storeKey, migrationInfo, participantId, svAcsStoreDescriptorUserVersion)
+      dsoStore = newDsoStore(
+        svStore.key,
+        migrationInfo,
+        participantId,
+        dsoAcsStoreDescriptorUserVersion,
+      )
       svAutomation = newSvSvAutomationService(
         svStore,
         dsoStore,
@@ -477,7 +488,7 @@ class SV1Initializer(
         val values = initialValues.tryUpdate(
           trafficControlParameters = Some(initialTrafficControlParameters),
           reconciliationInterval =
-            PositiveSeconds.fromConfig(SvUtil.defaultAcsCommitmentReconciliationInterval),
+            PositiveSeconds.fromConfig(sv1Config.acsCommitmentReconciliationInterval),
           acsCommitmentsCatchUp = Some(SvUtil.defaultAcsCommitmentsCatchUpParameters),
           preparationTimeRecordTimeTolerance =
             NonNegativeFiniteDuration.fromConfig(config.preparationTimeRecordTimeTolerance),
@@ -646,7 +657,11 @@ class SV1Initializer(
     private def bootstrapDso(initialRound: Long, packageVersionSupport: PackageVersionSupport)(
         implicit tc: TraceContext
     ): Future[Unit] = {
-      val dsoRulesConfig = SvUtil.defaultDsoRulesConfig(synchronizerId, sv1Config.voteCooldownTime)
+      val dsoRulesConfig = SvUtil.defaultDsoRulesConfig(
+        synchronizerId,
+        sv1Config.voteCooldownTime,
+        sv1Config.acsCommitmentReconciliationInterval,
+      )
       for {
         (participantId, trafficStateForAllMembers, amuletRules, dsoRules) <- (
           participantAdminConnection.getParticipantId(),
@@ -663,22 +678,29 @@ class SV1Initializer(
                     show"This should never happen.\nAmuletRules: $amuletRules"
                 )
               case None =>
-                val amuletConfig = defaultAmuletConfig(
-                  sv1Config.initialTickDuration,
-                  sv1Config.initialMaxNumInputs,
-                  synchronizerId,
-                  sv1Config.initialSynchronizerFeesConfig.extraTrafficPrice.value,
-                  sv1Config.initialSynchronizerFeesConfig.minTopupAmount.value,
-                  sv1Config.initialSynchronizerFeesConfig.baseRateBurstAmount.value,
-                  sv1Config.initialSynchronizerFeesConfig.baseRateBurstWindow,
-                  sv1Config.initialSynchronizerFeesConfig.readVsWriteScalingFactor.value,
-                  sv1Config.initialPackageConfig.toPackageConfig,
-                  sv1Config.initialHoldingFee,
-                  sv1Config.zeroTransferFees,
-                  sv1Config.initialTransferPreapprovalFee,
-                  sv1Config.initialFeaturedAppActivityMarkerAmount,
-                )
                 for {
+                  developmentFund <- packageVersionSupport.supportDevelopmentFund(
+                    Seq(svParty),
+                    clock.now,
+                  )
+                  amuletConfig = defaultAmuletConfig(
+                    sv1Config.initialTickDuration,
+                    sv1Config.initialMaxNumInputs,
+                    synchronizerId,
+                    sv1Config.initialSynchronizerFeesConfig.extraTrafficPrice.value,
+                    sv1Config.initialSynchronizerFeesConfig.minTopupAmount.value,
+                    sv1Config.initialSynchronizerFeesConfig.baseRateBurstAmount.value,
+                    sv1Config.initialSynchronizerFeesConfig.baseRateBurstWindow,
+                    sv1Config.initialSynchronizerFeesConfig.readVsWriteScalingFactor.value,
+                    sv1Config.initialPackageConfig.toPackageConfig,
+                    sv1Config.initialHoldingFee,
+                    sv1Config.zeroTransferFees,
+                    sv1Config.initialTransferPreapprovalFee,
+                    sv1Config.initialFeaturedAppActivityMarkerAmount,
+                    developmentFundPercentage =
+                      if (developmentFund.supported) sv1Config.developmentFundPercentage else None,
+                    developmentFundManager = sv1Config.developmentFundManager,
+                  )
                   sv1SynchronizerNodes <- SvUtil.getSV1SynchronizerNodeConfig(
                     cometBftNode,
                     localSynchronizerNode,

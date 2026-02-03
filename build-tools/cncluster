@@ -433,14 +433,15 @@ function subcmd_logs() {
 
 function k8s_labels_for_app() {
     local global_domain_specific_apps=("global-domain-cometbft" "global-domain-sequencer" "global-domain-mediator")
-    local domain_specific_apps=("participant")
+    local domain_specific_apps="@(participant|multi-participant-[0-9][0-9])"
 
     # shellcheck disable=SC2076
+    # shellcheck disable=SC2053
     if [[ " ${global_domain_specific_apps[*]} " =~ " ${app} " ]]; then
        # If the app is in the list, append the domain to the app
        app_container=${app#"global-domain-"}
        app="global-domain-${domain}-${app#"global-domain-"}"
-    elif [[ " ${domain_specific_apps[*]} " =~ " ${app} " ]]; then
+    elif [[ "$app" == $domain_specific_apps ]]; then
        # If the app is in the list, append the domain to the app
        app="${app}-${domain}"
     fi
@@ -1468,7 +1469,7 @@ subcommand_whitelist[debug_shell]='Spin up a debug container on the cluster, and
 function subcmd_debug_shell() {
   _cluster_must_exist
 
-  VERSION_NUMBER=${OVERRIDE_VERSION:-$(yq ".synchronizerMigration.active.version" < config.yaml)}
+  VERSION_NUMBER=${OVERRIDE_VERSION:-$("${SPLICE_ROOT}/cluster/scripts/get-resolved-config.sh" | yq ".synchronizerMigration.active.version")}
   if [ -z "$VERSION_NUMBER" ] || [ "$VERSION_NUMBER" = "null" ]; then
     VERSION_NUMBER=$(get-snapshot-version)
   fi
@@ -1517,12 +1518,20 @@ function subcmd_participant_console() {
 
     namespace="${1-}"
     domain=${2:-0}
+    app=${3:-"participant"}
+    participant_number=${4:-0}
 
     if [ -z "${namespace}" ]; then
-        _error "Usage: $SCRIPTNAME participant_console <namespace-name> [domain_migration_id]"
+        _error "Usage: $SCRIPTNAME participant_console <namespace-name> [domain_migration_id (Default: 0)]
+        [app <participant|multi-participant-X> (Default: participant)] [participant_number <0-9> (Default: 0)]
+
+              Example: opening sv-1 participant console
+                cncluster participant_console sv-1 7
+
+              Example: opening multi-participant-24 console
+                cncluster participant_console multi-validator 7 multi-participant-24 7"
     fi
 
-    app="participant"
     app_container="$app"
     k8s_labels_for_app
 
@@ -1584,7 +1593,7 @@ function subcmd_participant_console() {
     fi
 
     _info "Starting port forwarding from '$participant_pod'..."
-    kubectl port-forward -n "$namespace" "$participant_pod" 11001:5001 11002:5002 &
+    kubectl port-forward -n "$namespace" "$participant_pod" 11001:5"${participant_number}"01 11002:5"${participant_number}"02 &
     port_forwarding_pid=$!
 
     _info "Starting Canton console..."
@@ -1726,8 +1735,8 @@ subcommand_whitelist[backup_nodes]='Backup one or more CN nodes in the cluster'
 function subcmd_backup_nodes() {
     _cluster_must_exist
 
-    if [ "$#" -lt 2 ]; then
-       echo "Usage: $0 <migration_id> <internal_stack> [node...]"
+    if [ "$#" -lt 1 ]; then
+       echo "Usage: $0 <migration_id> [node...]"
        exit 1
     fi
 
@@ -1735,19 +1744,14 @@ function subcmd_backup_nodes() {
         echo "Usage: $0 <migration_id> [node...]"
         _error "<migration_id> must be a positive integer"
     fi
-
-    if [[ "$2" != "true" && "$2" != "false" ]]; then
-        echo "Usage: $0 <internal_stack> [node...]"
-        _error "<internal_stack> must be either \"true\" or \"false\""
-    fi
-
     migration_id=$1
-    internal_stack=$2
 
-    if [ $# -eq 2 ]; then
+    # If only migration is set, backup everything, otherwise backup specified nodes
+    # Notably, prod networks which don't have sv-2 % sv-3
+    if [ $# -eq 1 ]; then
         nodes="sv-1 sv-2 sv-3 sv-da-1 validator1 splitwell"
     else
-        shift 2
+        shift 1
         nodes="$*"
     fi
 
@@ -1755,11 +1759,11 @@ function subcmd_backup_nodes() {
         case "$node" in
             sv-1|sv-2|sv-3|sv-4|sv-da-1)
                 _info "Backing up sv node $node"
-                SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$SPLICE_ROOT"/cluster/scripts/node-backup.sh sv "$node" "$migration_id" "$internal_stack"
+                SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$SPLICE_ROOT"/cluster/scripts/node-backup.sh sv "$node" "$migration_id"
                 ;;
             validator1|splitwell)
                 _info "Backing up validator node $node"
-                SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$SPLICE_ROOT"/cluster/scripts/node-backup.sh validator "$node" "$migration_id" "$internal_stack"
+                SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$SPLICE_ROOT"/cluster/scripts/node-backup.sh validator "$node" "$migration_id"
                 ;;
             *)
                 _error "Unknown node $node"
@@ -1796,16 +1800,15 @@ function subcmd_restore_node() {
 
     node="${1-}"
     migration_id="${2-}"
-    internal_stack="${3-}"
-    backup_run_id="${4-}"
+    backup_run_id="${3-}"
 
     if [ -z "$node" ] || [ -z "$migration_id" ]; then
-        _error "Usage: $SCRIPTNAME restore_node <namespace_name> <migration_id> <internal_stack> [<backup_run_id>]"
+        _error "Usage: $SCRIPTNAME restore_node <namespace_name> <migration_id> [<backup_run_id>]"
     fi
 
     if [ -z "$backup_run_id" ]; then
         _info "No backup run_id given, looking for the latest full backup"
-        backup_run_id=$(SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$SPLICE_ROOT"/cluster/scripts/find-recent-backup.sh "$node" "$migration_id" "$internal_stack")
+        backup_run_id=$(SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$SPLICE_ROOT"/cluster/scripts/find-recent-backup.sh "$node" "$migration_id")
         if [[ -z "$backup_run_id" || "$backup_run_id" == "null" ]]; then
             _error "No recent backup found for $node"
         fi
@@ -1822,11 +1825,11 @@ function subcmd_restore_node() {
             _info "Silencing SV report creation alerts for $sv_name for 1 hour"
             subcmd_silence_grafana_alerts "1 hour" "alertname=Report Creation Time Lag" "report_publisher=$sv_name"
             _info "Restoring sv node $node"
-            SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$SPLICE_ROOT"/cluster/scripts/node-restore.sh $force "$node" "$migration_id" "$backup_run_id" "$internal_stack" cometbft sequencer participant mediator cn-apps
+            SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$SPLICE_ROOT"/cluster/scripts/node-restore.sh $force "$node" "$migration_id" "$backup_run_id" cometbft sequencer participant mediator cn-apps
             ;;
         validator1|splitwell)
             _info "Restoring validator node $node"
-            SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$SPLICE_ROOT"/cluster/scripts/node-restore.sh $force "$node" "$migration_id" "$backup_run_id" "$internal_stack" participant validator
+            SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$SPLICE_ROOT"/cluster/scripts/node-restore.sh $force "$node" "$migration_id" "$backup_run_id" participant validator
             ;;
         *)
             _error "Unknown node $node"

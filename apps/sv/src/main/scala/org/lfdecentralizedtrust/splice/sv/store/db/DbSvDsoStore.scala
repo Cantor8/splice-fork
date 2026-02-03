@@ -76,6 +76,7 @@ class DbSvDsoStore(
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
     ingestionConfig: IngestionConfig,
+    acsStoreDescriptorUserVersion: Option[Long] = None,
 )(implicit
     override protected val ec: ExecutionContext,
     override protected val templateJsonDecoder: TemplateJsonDecoder,
@@ -95,6 +96,7 @@ class DbSvDsoStore(
           "dsoParty" -> key.dsoParty.toProtoPrimitive,
           "svParty" -> key.svParty.toProtoPrimitive,
         ),
+        userVersion = acsStoreDescriptorUserVersion,
       ),
       domainMigrationInfo,
       ingestionConfig,
@@ -381,7 +383,7 @@ class DbSvDsoStore(
     synchronizerId,
   ).map(_.headOption.flatten.getOrElse(0L))
 
-  private def listRewardCouponsOnDomain[C, TCId <: ContractId[_], T](
+  private def listRewardCouponsOnDomain[C, TCId <: ContractId[?], T](
       companion: C,
       round: Long,
       synchronizerId: SynchronizerId,
@@ -500,7 +502,7 @@ class DbSvDsoStore(
       ignoredParties,
     )
 
-  private def listCouponsGroupedByRound[C, TCId <: ContractId[_]: ClassTag, T](
+  private def listCouponsGroupedByRound[C, TCId <: ContractId[?]: ClassTag, T](
       companion: C,
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
@@ -1388,7 +1390,7 @@ class DbSvDsoStore(
         )
     } yield result.map(contractFromRow(SvRewardState.COMPANION)(_))
 
-  private def lookupContractBySvParty[C, TCId <: ContractId[_], T](
+  private def lookupContractBySvParty[C, TCId <: ContractId[?], T](
       companion: C,
       svPartyId: PartyId,
   )(implicit
@@ -1415,7 +1417,7 @@ class DbSvDsoStore(
     }
   }
 
-  private def lookupContractBySvName[C, TCId <: ContractId[_], T](
+  private def lookupContractBySvName[C, TCId <: ContractId[?], T](
       companion: C,
       svName: String,
   )(implicit

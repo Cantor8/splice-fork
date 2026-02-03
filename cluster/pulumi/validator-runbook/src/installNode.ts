@@ -38,6 +38,8 @@ import {
   networkWideConfig,
   getValidatorAppApiAudience,
   getNamespaceConfig,
+  standardStorageClassName,
+  pvcSuffix,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { installLoopback } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { installParticipant } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
@@ -148,6 +150,8 @@ async function installValidator(
     topupConfig,
   } = validatorDeploymentConfig;
 
+  const participantPruningConfig = validatorConfig?.participantPruningSchedule;
+
   const supportsValidatorRunbookReset = config.envFlag('SUPPORTS_VALIDATOR_RUNBOOK_RESET', false);
   const postgresValues: ChartValues = loadYamlFromFile(
     `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/postgres-values-validator-participant.yaml`
@@ -201,6 +205,10 @@ async function installValidator(
     ),
   };
 
+  if (validatorConfig.validatorApp?.scanClient != null) {
+    delete validatorValuesFromYamlFiles.scanAddress;
+  }
+
   const newParticipantIdentifier =
     validatorConfig.newParticipantId ||
     validatorValuesFromYamlFiles?.participantIdentitiesDumpImport?.newParticipantIdentifier;
@@ -213,6 +221,8 @@ async function installValidator(
         ? true
         : validatorValuesFromYamlFiles.migration.migrating,
     },
+    scanClient: validatorConfig.validatorApp?.scanClient,
+    synchronizer: validatorConfig.validatorApp?.synchronizer,
     metrics: {
       enable: true,
     },
@@ -227,10 +237,15 @@ async function installValidator(
           newParticipantIdentifier,
         }
       : undefined,
+    participantPruningSchedule: participantPruningConfig,
     ...(participantBootstrapDumpSecret ? { nodeIdentifier: newParticipantIdentifier } : {}),
     persistence: {
       ...validatorValuesFromYamlFiles.persistence,
       postgresName: 'postgres',
+    },
+    pvc: {
+      volumeStorageClass: standardStorageClassName,
+      volumeName: `domain-migration-validator-${pvcSuffix}`,
     },
     db: { volumeSize: clusterSmallDisk ? '240Gi' : undefined },
     enablePostgresMetrics: true,
@@ -238,6 +253,7 @@ async function installValidator(
     maxVettingDelay: networkWideConfig?.maxVettingDelay,
     additionalEnvVars: validatorConfig.validatorApp?.additionalEnvVars,
     additionalJvmOptions: validatorConfig.validatorApp?.additionalJvmOptions,
+    resources: validatorConfig.validatorApp?.resources,
   };
 
   const validatorValuesWithOnboardingOverride = onboardingSecret

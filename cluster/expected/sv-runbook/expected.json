@@ -61,6 +61,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -190,6 +197,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -541,6 +555,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -714,7 +735,35 @@
   {
     "custom": false,
     "id": "",
-    "inputs": {},
+    "inputs": {
+      "appLabel": "scan-app",
+      "globalLimits": {
+        "fillInterval": "60s",
+        "maxTokens": 2147483647,
+        "tokensPerFill": 2147483647
+      },
+      "inboundPort": 5012,
+      "namespace": "sv",
+      "rateLimits": [
+        {
+          "actions": [
+            {
+              "name": "acs",
+              "pathPrefix": "/api/scan/v0/acs"
+            },
+            {
+              "clientIp": true,
+              "name": "client_ip"
+            }
+          ],
+          "limits": {
+            "fillInterval": "60s",
+            "maxTokens": 10,
+            "tokensPerFill": 5
+          }
+        }
+      ]
+    },
     "name": "splice-sv-scan-app-rate-limit",
     "provider": "",
     "type": "splice:RateLimit"
@@ -759,6 +808,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -812,6 +868,10 @@
           {
             "name": "ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION",
             "value": "canton.sv-apps.sv.bft-sequencer-connection = false"
+          },
+          {
+            "name": "ADDITIONAL_CONFIG_MEDIATOR_PRUNING",
+            "value": "canton.sv-apps.sv.local-synchronizer-node.mediator.pruning {\n                    cron = \"0 0 * * *\"\n                    max-duration = \"30m\"\n                    retention = \"7d\"\n                  }"
           }
         ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1 -DcustomSvAppJvmFlag",
@@ -824,6 +884,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }
@@ -886,7 +953,7 @@
           "sequencerAvailabilityDelay": "60 seconds",
           "sequencerPruningConfig": {
             "enabled": true,
-            "pruningInterval": "1 hours",
+            "pruningInterval": "1 hour",
             "retentionPeriod": "30 days"
           },
           "sequencerPublicUrl": "https://sequencer-3.sv.mock.global.canton.network.digitalasset.com",
@@ -921,6 +988,10 @@
           "host": "apps-pg.sv.svc.cluster.local",
           "postgresName": "apps-pg",
           "secretName": "apps-pg-secret"
+        },
+        "pvc": {
+          "volumeName": "sv-app-global-domain-migration-pvc",
+          "volumeStorageClass": "standard-rwo"
         },
         "resources": {
           "limits": {
@@ -1200,6 +1271,13 @@
                     {
                       "key": "cn_apps",
                       "operator": "Exists"
+                    },
+                    {
+                      "key": "cn_apps",
+                      "operator": "NotIn",
+                      "values": [
+                        "hyperdisk"
+                      ]
                     }
                   ]
                 }

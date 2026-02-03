@@ -8,13 +8,14 @@ import {
 } from '../../components/governance/ActionRequiredSection';
 import { ContractId } from '@daml/types';
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import dayjs from 'dayjs';
 import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 
 const requests: ActionRequiredData[] = [
   {
     actionName: 'Feature Application',
+    description: 'Test description for feature application',
     contractId: '2abcde123456' as ContractId<VoteRequest>,
     votingCloses: '2024-09-25 11:00',
     createdAt: '2024-09-25 11:00',
@@ -22,6 +23,7 @@ const requests: ActionRequiredData[] = [
   },
   {
     actionName: 'Set DSO Rules Configuration',
+    description: 'Test description for DSO rules configuration',
     contractId: '2bcde123456' as ContractId<VoteRequest>,
     votingCloses: '2024-09-25 11:00',
     createdAt: '2024-09-25 11:00',
@@ -38,10 +40,10 @@ describe('Action Required', () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByText('Action Required')).toBeDefined();
+    expect(await screen.findByText('Action Required')).toBeInTheDocument();
 
     const badge = screen.getByTestId('action-required-badge-count');
-    expect(badge).toBeDefined();
+    expect(badge).toBeInTheDocument();
     expect(badge.textContent).toBe(`${requests.length}`);
 
     expect(true).toBe(true);
@@ -54,7 +56,7 @@ describe('Action Required', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText('No Action Required items available')).toBeDefined();
+    expect(screen.getByText('No Action Required items available')).toBeInTheDocument();
   });
 
   test('should render all action required requests', () => {
@@ -73,6 +75,7 @@ describe('Action Required', () => {
     const closesDate = dayjs().add(10, 'days').format(dateTimeFormatISO);
     const actionRequired = {
       actionName: 'Feature Application',
+      description: 'Test description',
       contractId: '2abcde123456' as ContractId<VoteRequest>,
       votingCloses: closesDate,
       createdAt: createdDate,
@@ -86,28 +89,33 @@ describe('Action Required', () => {
     );
 
     const action = screen.getByTestId('action-required-action-content');
-    expect(action).toBeDefined();
+    expect(action).toBeInTheDocument();
     expect(action.textContent).toBe(actionRequired.actionName);
 
+    const description = screen.getByTestId('action-required-description-content');
+    expect(description).toBeInTheDocument();
+    expect(description.textContent).toBe(actionRequired.description);
+
     const createdAt = screen.getByTestId('action-required-created-at-content');
-    expect(createdAt).toBeDefined();
+    expect(createdAt).toBeInTheDocument();
     expect(createdAt.textContent).toBe(actionRequired.createdAt);
 
     const votingCloses = screen.getByTestId('action-required-voting-closes-content');
-    expect(votingCloses).toBeDefined();
+    expect(votingCloses).toBeInTheDocument();
     expect(votingCloses.textContent).toBe('10 days');
 
-    const requester = screen.getByTestId('action-required-requester-identifier-party-id');
-    expect(requester).toBeDefined();
+    const requester = screen.getByTestId('action-required-requester-identifier-value');
+    expect(requester).toBeInTheDocument();
     expect(requester.textContent).toBe(actionRequired.requester);
 
     const viewDetails = screen.getByTestId('action-required-view-details');
-    expect(viewDetails).toBeDefined();
+    expect(viewDetails).toBeInTheDocument();
   });
 
   test('should render isYou badge for requests created by viewing sv', () => {
     const actionRequired = {
       actionName: 'Feature Application',
+      description: 'Test description',
       contractId: '2abcde123456' as ContractId<VoteRequest>,
       votingCloses: '2029-09-25 11:00',
       createdAt: '2029-09-25 11:00',
@@ -121,13 +129,14 @@ describe('Action Required', () => {
       </MemoryRouter>
     );
 
-    const isYou = screen.getByTestId('action-required-requester-identifier-you');
-    expect(isYou).toBeDefined();
+    const isYou = screen.getByTestId('action-required-requester-identifier-badge');
+    expect(isYou).toBeInTheDocument();
   });
 
   test('should not render isYou badge for requests created by other svs', () => {
     const actionRequired = {
       actionName: 'Feature Application',
+      description: 'Test description',
       contractId: '2abcde123456' as ContractId<VoteRequest>,
       votingCloses: '2029-09-25 11:00',
       createdAt: '2029-09-25 11:00',
@@ -140,8 +149,8 @@ describe('Action Required', () => {
       </MemoryRouter>
     );
 
-    expect(() => screen.getByTestId('action-required-requester-identifier-you')).toThrowError(
-      /Unable to find an element/
-    );
+    const isYou = screen.queryByTestId('action-required-requester-identifier-badge');
+
+    expect(isYou).not.toBeInTheDocument();
   });
 });

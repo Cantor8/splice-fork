@@ -62,6 +62,7 @@ final case class DomainMigrationDump(
     createdAt = createdAt.toString,
     synchronizerWasPaused = Some(synchronizerWasPaused),
     separatePayloadFiles = Some(outputDirectory.isDefined),
+    acsFormat = Some(http.DomainMigrationDump.AcsFormat.LedgerApi),
   )
 }
 
@@ -92,6 +93,12 @@ object DomainMigrationDump {
       Dar(dar.hash, ByteString.copyFrom(decoded))
     }
     createdAt = Instant.parse(response.createdAt)
+    _ <- response.acsFormat.getOrElse(http.DomainMigrationDump.AcsFormat.AdminApi) match {
+      case http.DomainMigrationDump.AcsFormat.members.AdminApi =>
+        Left("Admin API ACS Format is unsupported since splice 0.5")
+      case http.DomainMigrationDump.AcsFormat.members.LedgerApi =>
+        Right(())
+    }
   } yield DomainMigrationDump(
     domainId = domainId,
     migrationId = migrationId,

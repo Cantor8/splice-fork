@@ -29,7 +29,6 @@ canton.participants.participant_$index = {
       acknowledgement-interval = 10m
       # Use a higher number of in flight batches to increase throughput
       maximum-in-flight-event-batches = 50
-      use-new-connection-pool = false
       enable-amplification-improvements = true
     }
 
@@ -72,6 +71,7 @@ canton.participants.participant_$index = {
 
     ledger-api {
         address = "0.0.0.0"
+        admin-token-config.admin-claim = true
         port = $ledger_port
         user-management-service.additional-admin-user-id = ${user}
         auth-services = [{
